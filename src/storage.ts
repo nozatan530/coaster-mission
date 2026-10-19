@@ -32,7 +32,7 @@ export const DEFAULT_CONFIG: CourseConfig = {
   loop2Bottom: 0.50, // 50 cm
   slowHeight: 1.45, // 145 cm
   launchHeight: 0.80, // 80 cm
-  launchAngle: 31, // 31度
+  launchAngle: 31, // 31度（140 cm の缶は 1.40 m 先なので、中心を向くのは 23°。初めはずれた角度から始める）
   canSize: 'small',
   canHeight: 1.40, // 140 cm
   motionType: 'rolling',
@@ -56,7 +56,7 @@ export const DEFAULT_PRACTICE2: Practice2State = {
 export const DEFAULT_PRACTICE3: Practice3State = {
   launchHeight: 0.80,
   launchSpeed: 2.9,
-  // 初めは缶へまっすぐ向けない角度にしておく（31°で缶の中心を向く）
+  // 初めは缶へまっすぐ向けない角度にしておく（140 cm の缶は 1.40 m 先。23°で缶の中心を向く）
   launchAngle: 20,
   canHeight: 1.40,
   showSightLine: false,

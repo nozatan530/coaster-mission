@@ -11,6 +11,7 @@ import {
   PHYSICS_CONSTANTS,
   SMALL_LOOP_RAIL_LENGTH,
   calculateRailUsage,
+  getCanDistance,
   simulateRun,
 } from '../physics';
 import { CourseIllustration } from './CourseIllustration';
@@ -28,7 +29,7 @@ const EXAMPLE_BASE: CourseConfig = {
   loop2Bottom: 1.0,
   slowHeight: 1.45,
   launchHeight: 0.8,
-  launchAngle: 31,
+  launchAngle: 23, // 140 cm の缶（1.40 m 先）の中心を向く角度
   canSize: 'small',
   canHeight: 1.4,
   motionType: 'rolling',
@@ -42,7 +43,15 @@ const EXAMPLES: { title: string; config: CourseConfig }[] = [
   },
   {
     title: '小ループを入れて、ゆっくり区間も狙う',
-    config: { ...EXAMPLE_BASE, loopType: 'small', loop1Bottom: 1.0, slowHeight: 1.4, canSize: 'medium' },
+    config: {
+      ...EXAMPLE_BASE,
+      loopType: 'small',
+      loop1Bottom: 1.0,
+      slowHeight: 1.4,
+      launchHeight: 0.6,
+      launchAngle: 30,
+      canSize: 'medium',
+    },
   },
   {
     title: '大と小のループ。ゆっくり区間はあきらめる',
@@ -53,7 +62,7 @@ const EXAMPLES: { title: string; config: CourseConfig }[] = [
       loop2Bottom: 0.6,
       slowHeight: 0.6,
       launchHeight: 0.6,
-      launchAngle: 40,
+      launchAngle: 30,
       canSize: 'medium',
     },
   },
@@ -266,11 +275,12 @@ export const Stage0Start: React.FC<Stage0StartProps> = ({
                   </tbody>
                 </table>
                 <table className="w-full text-[11px]">
-                  <caption className="text-left font-bold text-[#1D2B53] dark:text-[#EAEFFC] mb-0.5">つるす高さ（床から）</caption>
+                  <caption className="text-left font-bold text-[#1D2B53] dark:text-[#EAEFFC] mb-0.5">つるす高さ（床から）と距離</caption>
                   <tbody>
                     {[1.4, 1.2, 1.0, 0.8, 0.6].map((h) => (
                       <tr key={h} className="border-t border-[#D6DEF0]/60 dark:border-[#263657]/60">
                         <td className="py-0.5">{cm(h)}</td>
+                        <td className="py-0.5 text-right">{getCanDistance(h).toFixed(2)} m 先</td>
                         <td className="py-0.5 text-right font-bold text-[#1F9D74]">
                           {PHYSICS_CONSTANTS.CAN_HEIGHT_SCORES[h]}点
                         </td>
@@ -284,7 +294,8 @@ export const Stage0Start: React.FC<Stage0StartProps> = ({
                 いちばん高いのは、小さい缶を 140 cm につるして当てたときの 30＋50＝<strong className={strong}>80点</strong>。
               </div>
               <div className="mt-1">
-                缶は発射台から水平に 1.0 m 先にあり、<strong className={strong}>ボールが発射台を離れた瞬間に落ち始める</strong>。
+                缶は、<strong className={strong}>高くつるすほど発射台から遠くに置く</strong>（60 cm は 0.80 m 先 … 140 cm は 1.40 m 先）。遠いほど、左右に外れやすい。
+                そして缶は、<strong className={strong}>ボールが発射台を離れた瞬間に落ち始める</strong>。
               </div>
             </div>
 

@@ -18,6 +18,7 @@ import { CourseIllustration } from './CourseIllustration';
 import { EnergyBarChart } from './EnergyBarChart';
 import {
   calculateRailUsage,
+  getCanDistance,
   simulateRun,
   simulateTenRuns,
   PHYSICS_CONSTANTS,
@@ -322,7 +323,7 @@ export const StageDesign: React.FC<StageDesignProps> = ({
             <label className="block font-bold text-sub mb-1">何を変えたか・なぜか（記録表に残ります）</label>
             <input
               type="text"
-              placeholder="例: 発射台の角度を31°に変えて缶の中心に照準を合わせた"
+              placeholder="例: 発射台の角度を23°に変えて缶の中心に照準を合わせた"
               value={noteInput}
               onChange={(e) => setNoteInput(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-[#D6DEF0] dark:border-[#263657] bg-[#F4F8FF] dark:bg-[#0E1626] text-[#1D2B53] dark:text-[#EAEFFC]"
@@ -687,7 +688,7 @@ export const StageDesign: React.FC<StageDesignProps> = ({
 
             {/* 缶をつるす高さ */}
             <div>
-              <label className="block font-bold text-sub mb-1">缶をつるす高さ（床から）</label>
+              <label className="block font-bold text-sub mb-1">缶をつるす高さ（床から）と、発射台からの距離</label>
               <div className="grid grid-cols-5 gap-1.5 text-center font-bold">
                 {[
                   { h: 140, pts: 50 },
@@ -707,6 +708,7 @@ export const StageDesign: React.FC<StageDesignProps> = ({
                   >
                     <div>{item.h}cm</div>
                     <div className="text-[10px] font-mono text-[#1F9D74]">+{item.pts}</div>
+                    <div className="text-[10px] font-normal text-sub">{getCanDistance(item.h / 100).toFixed(2)} m 先</div>
                   </button>
                 ))}
               </div>

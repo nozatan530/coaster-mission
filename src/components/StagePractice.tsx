@@ -13,7 +13,7 @@ import {
 } from '../types';
 import { CourseCanvas } from './CourseCanvas';
 import { EnergyBarChart } from './EnergyBarChart';
-import { simulateRun, PHYSICS_CONSTANTS } from '../physics';
+import { simulateRun, getCanDistance, PHYSICS_CONSTANTS } from '../physics';
 import { DEFAULT_PRACTICE3 } from '../storage';
 import {
   HelpCircle,
@@ -502,7 +502,7 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
 
               {/* 缶のつるす高さ */}
               <div>
-                <label className="block font-bold text-sub mb-1.5">缶をつるす高さ</label>
+                <label className="block font-bold text-sub mb-1.5">缶をつるす高さ（高いほど遠くに置く）</label>
                 <div className="grid grid-cols-5 gap-1.5">
                   {[60, 80, 100, 120, 140].map((h) => (
                     <button
@@ -514,7 +514,8 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
                           : 'border-[#D6DEF0] dark:border-[#263657] text-sub'
                       }`}
                     >
-                      {h}cm
+                      <div>{h}cm</div>
+                      <div className="text-[10px] font-normal text-sub">{getCanDistance(h / 100).toFixed(2)} m 先</div>
                     </button>
                   ))}
                 </div>
