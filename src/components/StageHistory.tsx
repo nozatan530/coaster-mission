@@ -119,13 +119,24 @@ export const StageHistory: React.FC<StageHistoryProps> = ({
                         <button
                           onClick={() => onLoadConfig(entry.config)}
                           title="この設計を設計画面に復元"
+                          aria-label={`#${entry.trialNumber} の設計を設計画面に戻す`}
                           className="p-1 text-[#5AB0F0] hover:bg-sky-50 dark:hover:bg-sky-950/50 rounded transition-colors"
                         >
                           <ArrowUpRight className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => onDeleteEntry(entry.id)}
+                          onClick={() => {
+                            // 公式記録なので、押し間違いで消えないように確かめる
+                            if (
+                              window.confirm(
+                                `#${entry.trialNumber} の記録を消しますか？\n10回連続の結果と「何を変えたか・なぜか」が消え、元に戻せません。`
+                              )
+                            ) {
+                              onDeleteEntry(entry.id);
+                            }
+                          }}
                           title="削除"
+                          aria-label={`#${entry.trialNumber} の記録を削除`}
                           className="p-1 text-sub hover:text-[#E63946] hover:bg-red-50 dark:hover:bg-red-950/50 rounded transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
