@@ -46,6 +46,8 @@ export const StageReport: React.FC<StageReportProps> = ({
   onUpdateReport,
 }) => {
   const [copySuccess, setCopySuccess] = useState(false);
+  // 自動でコピーできなかったとき、手でコピーしてもらうための文章
+  const [manualCopyText, setManualCopyText] = useState<string | null>(null);
 
   // ベスト記録の算出
   const bestEntry = useMemo(() => {
@@ -183,12 +185,13 @@ ${reportState.reflection.q2 || '（未記入）'}
 ${reportState.reflection.q3 || '（未記入）'}
 `;
 
-    try {
-      await navigator.clipboard.writeText(text);
+    const copied = await copyToClipboard(text);
+    if (copied) {
+      setManualCopyText(null);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2500);
-    } catch (e) {
-      console.error(e);
+    } else {
+      setManualCopyText(text);
     }
   };
 
@@ -241,6 +244,30 @@ ${reportState.reflection.q3 || '（未記入）'}
           </button>
         </div>
       </div>
+
+      {/* 自動でコピーできなかったときの手動コピー欄 */}
+      {manualCopyText !== null && (
+        <div className="no-print bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-4 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs font-bold text-[#B45309] dark:text-[#FFC93C]">
+              自動でコピーできませんでした。下の枠の文章を全部選んで（Ctrl＋A または長押し →「すべて選択」）、コピーしてね。
+            </p>
+            <button
+              onClick={() => setManualCopyText(null)}
+              className="text-xs text-sub hover:text-[#1D2B53] dark:hover:text-[#EAEFFC] px-2 py-1 shrink-0"
+            >
+              閉じる
+            </button>
+          </div>
+          <textarea
+            readOnly
+            value={manualCopyText}
+            rows={8}
+            onFocus={(e) => e.currentTarget.select()}
+            className="w-full text-xs font-mono px-3 py-2 rounded-lg border border-[#D6DEF0] dark:border-[#263657] bg-white dark:bg-[#0E1626] text-[#1D2B53] dark:text-[#EAEFFC]"
+          />
+        </div>
+      )}
 
       {/* レポート本文（印刷時にA4に最適化） */}
       <div className="print-card bg-white dark:bg-[#17223B] border border-[#D6DEF0] dark:border-[#263657] rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
@@ -526,4 +553,30 @@ function PHYSICS_DATA_LABEL(canSize: string): string {
   if (canSize === 'small') return '小缶(φ6cm)';
   if (canSize === 'medium') return '中缶(φ9cm)';
   return '大缶(φ12cm)';
+}
+
+// クリップボードにコピーする。新しい方法が使えないときは、古い方法（execCommand）でも試す
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // 下の方法で試す
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
 }
