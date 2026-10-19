@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* dark: の色は、端末（OS）の設定ではなく、アプリのテーマ切替（html の .dark クラス）に従う。
+   印刷は常にライトの色にするため、画面表示のときだけ効かせる */
+@custom-variant dark {
+  @media screen {
+    &:where(.dark, .dark *) {
+      @slot;
+    }
+  }
+}
+
 @layer base {
   :root {
     --color-ink: #1D2B53;
@@ -73,7 +83,22 @@
     margin: 12mm 15mm;
   }
 
-  body {
+  /* ダークモードで印刷しても、色の変数はライトの値にする */
+  .dark {
+    --color-ink: #1D2B53;
+    --color-sky: #5AB0F0;
+    --color-red: #E63946;
+    --color-yellow: #FFC93C;
+    --color-bg: #FFFFFF;
+    --color-card: #FFFFFF;
+    --color-line: #D6DEF0;
+    --color-success: #1F9D74;
+    --color-fail: #D1495B;
+    --color-subtext: #5A6A85;
+  }
+
+  body,
+  .bg-theme {
     background-color: #ffffff !important;
     color: #111827 !important;
     font-size: 11pt;
