@@ -14,6 +14,7 @@ import {
 import { CourseCanvas } from './CourseCanvas';
 import { EnergyBarChart } from './EnergyBarChart';
 import { simulateRun, PHYSICS_CONSTANTS } from '../physics';
+import { DEFAULT_PRACTICE3 } from '../storage';
 import {
   HelpCircle,
   Eye,
@@ -104,9 +105,22 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
     [p3State]
   );
 
-  // 現在のタブのアクティブ設定とシミュレーション
+  // 発射練習の「飛び出す速さ」（古い保存データには無いので既定値で補う）
+  const launchSpeed = p3State.launchSpeed ?? DEFAULT_PRACTICE3.launchSpeed;
+
+  // 現在のタブのアクティブ設定とシミュレーション。練習ではその部品だけを走らせる
   const currentConfig = activeTab === 1 ? p1Config : activeTab === 2 ? p2Config : p3Config;
-  const simResult = useMemo(() => simulateRun(currentConfig, { isIdeal: true }), [currentConfig]);
+  const focus = activeTab === 1 ? 'loop' : activeTab === 2 ? 'slow' : 'launch';
+  const simResult = useMemo(
+    () => simulateRun(currentConfig, { isIdeal: true, practice: focus, launchSpeed }),
+    [currentConfig, focus, launchSpeed]
+  );
+
+  // 棒グラフの目盛りの基準（はじめに持っている力学的エネルギーを、高さに換算した値）
+  const energyBaseHeight =
+    activeTab === 3
+      ? (simResult.trajectory[0]?.K ?? 0) / PHYSICS_CONSTANTS.G + p3State.launchHeight
+      : currentConfig.startHeight;
 
   const handleRun = () => {
     setIsAnimating(false);
@@ -198,7 +212,11 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
         {/* コース可視化 (Canvas) */}
         <div className="lg:col-span-2 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-sub">コース断面シミュレーション</span>
+            <span className="text-xs font-bold text-sub">
+              {activeTab === 1 && 'スタート台 → 坂 → ループ だけのコース'}
+              {activeTab === 2 && 'スタート台 → 坂 → ゆっくり区間 だけのコース'}
+              {activeTab === 3 && '発射台 → 缶 だけのコース'}
+            </span>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleRun}
@@ -219,13 +237,14 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
             onCurrentPointChange={setCurrentPt}
             onUpdateConfig={handleUpdatePracticeConfig}
             showSightLine={activeTab === 3 && p3State.showSightLine}
+            focus={focus}
           />
         </div>
 
         {/* リアルタイム エネルギーグラフ */}
         <div className="space-y-2">
           <span className="text-xs font-bold text-sub">エネルギー推移</span>
-          <EnergyBarChart currentPoint={currentPt} startHeight={currentConfig.startHeight} />
+          <EnergyBarChart currentPoint={currentPt} startHeight={energyBaseHeight} />
         </div>
       </div>
 
@@ -234,8 +253,12 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
         {/* 左側：パラメータ調整コントロール */}
         <div className="bg-white dark:bg-[#17223B] border border-[#D6DEF0] dark:border-[#263657] rounded-xl p-5 shadow-xs space-y-4">
           <h4 className="text-sm font-bold text-[#1D2B53] dark:text-[#EAEFFC] flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-            <span>パラメータ調整（レールの長さ制限なし）</span>
-            <span className="text-xs text-[#5AB0F0] font-normal">自由に試して法則を探そう</span>
+            <span>
+              {activeTab === 1 && 'ループだけを試す'}
+              {activeTab === 2 && 'ゆっくり区間だけを試す'}
+              {activeTab === 3 && '缶当てだけを試す'}
+            </span>
+            <span className="text-xs text-[#5AB0F0] font-normal">レールの長さ制限なし</span>
           </h4>
 
           {/* TAB 1: ループ練習用コントロール */}
@@ -377,6 +400,42 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
           {/* TAB 3: 発射・缶当て用コントロール */}
           {activeTab === 3 && (
             <div className="space-y-4 text-xs">
+              {/* 飛び出す速さ */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold text-sub">発射台を飛び出す速さ</span>
+                  <span className="font-mono font-bold text-[#1D2B53] dark:text-[#EAEFFC]">
+                    {launchSpeed.toFixed(1)} m/s（時速 {(launchSpeed * 3.6).toFixed(1)} km）
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onUpdateP3({ launchSpeed: Math.max(1.0, Math.round((launchSpeed - 0.1) * 10) / 10) })}
+                    className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 font-bold"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="range"
+                    min={1.0}
+                    max={4.0}
+                    step={0.1}
+                    value={launchSpeed}
+                    onChange={(e) => onUpdateP3({ launchSpeed: Number(e.target.value) })}
+                    className="flex-1 accent-[#5AB0F0]"
+                  />
+                  <button
+                    onClick={() => onUpdateP3({ launchSpeed: Math.min(4.0, Math.round((launchSpeed + 0.1) * 10) / 10) })}
+                    className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 font-bold"
+                  >
+                    +
+                  </button>
+                </div>
+                <p className="text-[11px] text-sub mt-1">
+                  本番では、この速さはスタートや坂の高さで決まる。練習では直接決めて試そう。
+                </p>
+              </div>
+
               <HeightControl
                 label="発射台の高さ"
                 valueCm={Math.round(p3State.launchHeight * 100)}

@@ -8,6 +8,9 @@ export type CanSize = 'small' | 'medium' | 'large';
 
 export type MotionType = 'rolling' | 'sliding'; // 転がる球 (0.7mv^2) vs すべる物体 (0.5mv^2)
 
+// 練習ステージで走らせる部品（その部品だけのコースにする）
+export type PracticeFocus = 'loop' | 'slow' | 'launch';
+
 export interface CourseConfig {
   startHeight: number; // 0.10 ~ 1.50m (10cm刻み)
   loopType: LoopType;
@@ -146,6 +149,7 @@ export interface Practice2State {
 
 export interface Practice3State {
   launchHeight: number;
+  launchSpeed: number; // 発射台を飛び出す速さ (m/s)。練習ではこれを直接決める
   launchAngle: number;
   canHeight: number;
   showSightLine: boolean;

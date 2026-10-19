@@ -9,6 +9,7 @@ import {
   FailReasonType,
   LoopType,
   MotionType,
+  PracticeFocus,
   RailBreakdown,
   SimulationResult,
   TrajectoryPoint,
@@ -210,6 +211,12 @@ export interface SimulationOptions {
   forcedMu?: number;
   forcedAngleDelta?: number;
   forcedLateralDelta?: number;
+  // 練習ステージ用：その部品だけを走らせる
+  //   loop   … スタート台 → 坂 → ループ を出たところで終わり
+  //   slow   … スタート台 → 坂 → ゆっくり区間 を出たところで終わり
+  //   launch … 発射台から始め、launchSpeed（発射台を飛び出す速さ m/s）で飛ばす
+  practice?: PracticeFocus;
+  launchSpeed?: number;
 }
 
 export function simulateRun(
@@ -217,6 +224,7 @@ export function simulateRun(
   options: SimulationOptions = {}
 ): SimulationResult {
   const isIdeal = options.isIdeal ?? true;
+  const practice = options.practice;
   const {
     startHeight,
     loopType,
@@ -295,11 +303,21 @@ export function simulateRun(
     });
   }
 
+  // 発射練習：発射台の根元から始める。摩擦のぶんを足して、先端を飛び出す速さが launchSpeed になるようにする
+  if (practice === 'launch') {
+    const v = options.launchSpeed ?? 0;
+    currentHeight = launchHeight;
+    E = factor * v * v + PHYSICS_CONSTANTS.G * mu * PHYSICS_CONSTANTS.LAUNCH_FLAT_LENGTH;
+    addPoint(0, currentHeight, Math.sqrt(E / factor), '発射台');
+  }
+
   // 1. スタート台 (0.30m)
-  addPoint(0, currentHeight, 0, 'スタート台');
-  // スタート台先端
-  currentX += PHYSICS_CONSTANTS.START_FLAT_LENGTH;
-  addPoint(currentX, currentHeight, 0, 'スタート台先端');
+  if (practice !== 'launch') {
+    addPoint(0, currentHeight, 0, 'スタート台');
+    // スタート台先端
+    currentX += PHYSICS_CONSTANTS.START_FLAT_LENGTH;
+    addPoint(currentX, currentHeight, 0, 'スタート台先端');
+  }
 
   // 得点トラッキング
   let loopPoints = 0;
@@ -366,6 +384,9 @@ export function simulateRun(
       rail: SMALL_LOOP_RAIL_LENGTH,
     });
   }
+
+  // 発射練習ではループを通らない
+  if (practice === 'launch') loops.length = 0;
 
   // ヘルパー：坂道（または平地）を進める
   function traverseRamp(targetHeight: number, label: string): { ok: boolean; reason?: FailReasonType } {
@@ -556,72 +577,91 @@ export function simulateRun(
     }
   }
 
-  // --- ゆっくり区間への坂 ---
-  const toSlowRes = traverseRamp(slowHeight, 'ゆっくり区間への坂');
-  if (!toSlowRes.ok) {
-    return makeResult({
-      failReason: toSlowRes.reason,
-      failDescription:
-        toSlowRes.reason === 'slope_rollback'
-          ? 'ゆっくり区間への上り坂を登りきれずに戻ってしまいました'
-          : 'ゆっくり区間の手前で停止してしまいました',
-      failedAt: 'ゆっくり区間手前の坂',
-    });
+  // ループ練習：ループを出て少し進んだところで終わり
+  if (practice === 'loop') {
+    const exitLength = 0.3;
+    const exitLoss = PHYSICS_CONSTANTS.G * mu * exitLength;
+    E = Math.max(0, E - exitLoss);
+    T += exitLoss;
+    currentX += exitLength;
+    const vExit = Math.sqrt(E / factor);
+    addPoint(currentX, currentHeight, vExit, 'ループ通過後', exitLength / Math.max(0.1, vExit));
+    return makeResult({ success: true });
   }
 
-  // --- ゆっくり区間 (0.50m) ---
-  const slowHalfRail = PHYSICS_CONSTANTS.SLOW_FLAT_LENGTH / 2; // 0.25m
-  const slowLossHalf = PHYSICS_CONSTANTS.G * mu * slowHalfRail;
+  if (practice !== 'launch') {
+    // --- ゆっくり区間への坂 ---
+    const toSlowRes = traverseRamp(slowHeight, 'ゆっくり区間への坂');
+    if (!toSlowRes.ok) {
+      return makeResult({
+        failReason: toSlowRes.reason,
+        failDescription:
+          toSlowRes.reason === 'slope_rollback'
+            ? 'ゆっくり区間への上り坂を登りきれずに戻ってしまいました'
+            : 'ゆっくり区間の手前で停止してしまいました',
+        failedAt: 'ゆっくり区間手前の坂',
+      });
+    }
 
-  if (E - slowLossHalf <= 0) {
-    E = 0;
-    addPoint(currentX + 0.1, currentHeight, 0, 'ゆっくり区間（停止）', 0.1);
-    return makeResult({
-      failReason: 'slow_stop',
-      failDescription: 'ゆっくり区間で止まってしまいました（速度が0になりました）',
-      failedAt: 'ゆっくり区間前半',
-    });
-  }
+    // --- ゆっくり区間 (0.50m) ---
+    const slowHalfRail = PHYSICS_CONSTANTS.SLOW_FLAT_LENGTH / 2; // 0.25m
+    const slowLossHalf = PHYSICS_CONSTANTS.G * mu * slowHalfRail;
 
-  E -= slowLossHalf;
-  T += slowLossHalf;
-  currentX += slowHalfRail;
+    if (E - slowLossHalf <= 0) {
+      E = 0;
+      addPoint(currentX + 0.1, currentHeight, 0, 'ゆっくり区間（停止）', 0.1);
+      return makeResult({
+        failReason: 'slow_stop',
+        failDescription: 'ゆっくり区間で止まってしまいました（速度が0になりました）',
+        failedAt: 'ゆっくり区間前半',
+      });
+    }
 
-  // 中央での速度測定 (km/h)
-  const vMid = Math.sqrt(E / factor);
-  slowSpeedKmh = vMid * 3.6;
-  speedsRecord.slowMidKmh = slowSpeedKmh;
-  slowSpeedPoints = calculateSlowPoints(slowSpeedKmh);
+    E -= slowLossHalf;
+    T += slowLossHalf;
+    currentX += slowHalfRail;
 
-  addPoint(currentX, currentHeight, vMid, 'ゆっくり区間中央 (計測点)', slowHalfRail / Math.max(0.1, vMid));
+    // 中央での速度測定 (km/h)
+    const vMid = Math.sqrt(E / factor);
+    slowSpeedKmh = vMid * 3.6;
+    speedsRecord.slowMidKmh = slowSpeedKmh;
+    slowSpeedPoints = calculateSlowPoints(slowSpeedKmh);
 
-  // ゆっくり区間の後半 (0.25m)
-  if (E - slowLossHalf <= 0) {
-    E = 0;
-    addPoint(currentX + 0.1, currentHeight, 0, 'ゆっくり区間後半（停止）', 0.1);
-    return makeResult({
-      failReason: 'slow_stop',
-      failDescription: 'ゆっくり区間の後半で止まってしまいました',
-      failedAt: 'ゆっくり区間後半',
-    });
-  }
+    addPoint(currentX, currentHeight, vMid, 'ゆっくり区間中央 (計測点)', slowHalfRail / Math.max(0.1, vMid));
 
-  E -= slowLossHalf;
-  T += slowLossHalf;
-  currentX += slowHalfRail;
-  addPoint(currentX, currentHeight, Math.sqrt(E / factor), 'ゆっくり区間出口', slowHalfRail / Math.max(0.1, vMid));
+    // ゆっくり区間の後半 (0.25m)
+    if (E - slowLossHalf <= 0) {
+      E = 0;
+      addPoint(currentX + 0.1, currentHeight, 0, 'ゆっくり区間後半（停止）', 0.1);
+      return makeResult({
+        failReason: 'slow_stop',
+        failDescription: 'ゆっくり区間の後半で止まってしまいました',
+        failedAt: 'ゆっくり区間後半',
+      });
+    }
 
-  // --- 発射台への坂 ---
-  const toLaunchRes = traverseRamp(launchHeight, '発射台への坂');
-  if (!toLaunchRes.ok) {
-    return makeResult({
-      failReason: toLaunchRes.reason,
-      failDescription:
-        toLaunchRes.reason === 'slope_rollback'
-          ? '発射台への坂を登りきれずに戻ってしまいました'
-          : '発射台の手前で停止してしまいました',
-      failedAt: '発射台手前の坂',
-    });
+    E -= slowLossHalf;
+    T += slowLossHalf;
+    currentX += slowHalfRail;
+    addPoint(currentX, currentHeight, Math.sqrt(E / factor), 'ゆっくり区間出口', slowHalfRail / Math.max(0.1, vMid));
+
+    // ゆっくり区間練習：区間を出たところで終わり
+    if (practice === 'slow') {
+      return makeResult({ success: true });
+    }
+
+    // --- 発射台への坂 ---
+    const toLaunchRes = traverseRamp(launchHeight, '発射台への坂');
+    if (!toLaunchRes.ok) {
+      return makeResult({
+        failReason: toLaunchRes.reason,
+        failDescription:
+          toLaunchRes.reason === 'slope_rollback'
+            ? '発射台への坂を登りきれずに戻ってしまいました'
+            : '発射台の手前で停止してしまいました',
+        failedAt: '発射台手前の坂',
+      });
+    }
   }
 
   // --- 発射台 (0.30m 角度θで直進) ---

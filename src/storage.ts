@@ -54,6 +54,7 @@ export const DEFAULT_PRACTICE2: Practice2State = {
 
 export const DEFAULT_PRACTICE3: Practice3State = {
   launchHeight: 0.80,
+  launchSpeed: 2.9,
   launchAngle: 31,
   canHeight: 1.40,
   showSightLine: false,
