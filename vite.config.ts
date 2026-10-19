@@ -5,6 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // 公開先はサブドメインの直下（coaster-mission.meetupsensei.com/）なので、ルートから配信する
+    base: '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
