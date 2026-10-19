@@ -76,6 +76,18 @@ export const DEFAULT_REPORT: ReportState = {
   },
 };
 
+// この端末で記録を保存できるか（プライベートモードや端末の制限で使えないことがある）
+export function isStorageAvailable(): boolean {
+  try {
+    const key = 'ball_coaster_storage_test';
+    localStorage.setItem(key, '1');
+    localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function safeGetStorage<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);

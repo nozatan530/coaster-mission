@@ -28,9 +28,13 @@ import {
   safeSetStorage,
   clearAllStorage,
   STORAGE_KEYS,
+  isStorageAvailable,
 } from './storage';
 
 export default function App() {
+  // 記録を保存できない端末では、閉じると消えることを知らせる
+  const [storageAvailable] = useState(() => isStorageAvailable());
+
   // --- テーマ設定 (ダーク / ライト) ---
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = safeGetStorage<string>(STORAGE_KEYS.THEME, '');
@@ -177,6 +181,15 @@ export default function App() {
         onToggleTheme={() => setIsDarkMode((prev) => !prev)}
         canProceedToPractice={canProceedToPractice}
       />
+
+      {!storageAvailable && (
+        <div role="alert" className="no-print bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900/40">
+          <p className="max-w-6xl mx-auto px-4 py-2 text-xs font-bold text-[#B45309] dark:text-[#FFC93C]">
+            この端末（ブラウザ）では記録を保存できません。ページを閉じたり読み込み直したりすると、入力や試走の記録が消えます。
+            続けて使う場合は、最後にレポートを印刷・コピーしてから閉じてね。
+          </p>
+        </div>
+      )}
 
       <main className="flex-1 pb-16">
         {currentStage === 'start' && (
