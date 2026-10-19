@@ -47,7 +47,9 @@ const cases: Case[] = [
   {
     name: 'B 小ループ(100cm)・ゆっくり140cm・中の缶140cm',
     config: { ...base, loopType: 'small', loop1Bottom: 1.0, slowHeight: 1.4, canSize: 'medium' },
-    expected: { rail: 5.2, exceeded: false, scores: { loop: 10, slow: 28, can: 70, total: 108 } },
+    // ゆっくり区間の中央は 2.2514 km/h で、四捨五入の境目（2.25 km/h）に乗る。
+    // 2.3 km/h → 27点が正しい（当初の試算 28点・合計108点は、境目の反対側に出た値）
+    expected: { rail: 5.2, exceeded: false, scores: { loop: 10, slow: 27, can: 70, total: 107 } },
   },
   {
     name: 'C 大(50cm)→小(50cm)・ゆっくり130cm・小さい缶',
