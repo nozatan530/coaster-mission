@@ -81,6 +81,8 @@ export default function App() {
   // 永続化同期
   useEffect(() => {
     safeSetStorage(STORAGE_KEYS.STAGE, currentStage);
+    // 画面を切り替えたら、新しい画面の一番上から見せる
+    window.scrollTo({ top: 0 });
   }, [currentStage]);
 
   useEffect(() => {
