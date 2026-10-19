@@ -4,10 +4,45 @@
  * スタート高さ・ループ設計・ゆっくり区間・発射高さ・発射角度・缶の高さをドラッグで変更可能
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { CourseConfig, PracticeFocus, SimulationResult, TrajectoryPoint } from '../types';
 import { PHYSICS_CONSTANTS } from '../physics';
-import { Play, Pause, RotateCcw, CheckCircle2, AlertTriangle, Move } from 'lucide-react';
+import { Play, Pause, RotateCcw, CheckCircle2, AlertTriangle, Move, Volume2, VolumeX } from 'lucide-react';
+import {
+  drawCan,
+  drawCanStand,
+  drawFloorShadow,
+  drawLabScene,
+  drawMetalStand,
+  drawMeterStick,
+  drawPhotogate,
+  drawPopup,
+  drawSparks,
+  drawSteelBall,
+  speedColor,
+  strokeMetalRail,
+} from './courseArt';
+import * as sound from '../sound';
+
+// 演出用（得点の計算には使わない）：命中・外れのあとに動きを見せる時間 (s)
+const AFTER_SEC = 1.3;
+const AFTER_RATE = 120; // 1 秒あたりの記録数
+
+interface MotionSample {
+  x: number;
+  y: number;
+  a: number; // 回転角 (rad)
+  v: number;
+}
+
+interface EffectEvent {
+  t: number;
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  kind: 'loop' | 'slow' | 'hit';
+}
 
 export type DragHandleType =
   | 'startHeight'
@@ -74,7 +109,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
   const currentTimeSecRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
   const lastTimestampRef = useRef<number>(0);
-  const playbackSpeedRef = useRef<1.0 | 0.5>(1.0);
+  const playbackSpeedRef = useRef<number>(1.0);
   const lastPointNotifyTimeRef = useRef<number>(0);
 
   // ドラッグ操作の状態
@@ -85,7 +120,8 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
 
   // UI表示用のステート
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState<1.0 | 0.5>(1.0);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
+  const [soundOn, setSoundOn] = useState<boolean>(() => sound.isSoundEnabled());
   const [animStatus, setAnimStatus] = useState<'ready' | 'running' | 'finished'>('ready');
   const [currentSectionLabel, setCurrentSectionLabel] = useState<string>('スタート待機中');
 
@@ -186,6 +222,148 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
     [simulationResult, config]
   );
 
+  // --- 演出用：点が入る場面と、命中・外れのあとの動き（得点の計算には使わない） ---
+  const effects = useMemo(() => {
+    const result = {
+      events: [] as EffectEvent[],
+      ballAfter: [] as MotionSample[],
+      canAfter: [] as MotionSample[],
+      ballLandT: -1,
+      canLandT: -1,
+      tail: 0.6,
+    };
+    if (!simulationResult) return result;
+    const traj = simulationResult.trajectory;
+    const totalTime = simulationResult.totalTime;
+    const G = PHYSICS_CONSTANTS.G;
+
+    // ループを回れたとき（頂上を過ぎた瞬間）
+    const loopKinds =
+      config.loopType === 'small' ? ['small'] :
+      config.loopType === 'large' ? ['large'] :
+      config.loopType === 'small_large' ? ['small', 'large'] :
+      config.loopType === 'large_small' ? ['large', 'small'] : [];
+    loopKinds.forEach((kind, i) => {
+      const n = i + 1;
+      const passed = traj.some((p) => p.section === `ループ${n}通過`);
+      let topIdx = -1;
+      traj.forEach((p, idx) => {
+        if (p.section === `ループ${n}上昇`) topIdx = idx;
+      });
+      if (passed && topIdx >= 0) {
+        const pts = kind === 'large' ? PHYSICS_CONSTANTS.LOOP_SCORES.large : PHYSICS_CONSTANTS.LOOP_SCORES.small;
+        const top = traj[topIdx];
+        result.events.push({ t: top.time, x: top.x, y: top.y + 0.06, text: `+${pts}`, color: '#1F9D74', kind: 'loop' });
+      }
+    });
+
+    // ゆっくり区間の計測
+    const mid = traj.find((p) => p.section.startsWith('ゆっくり区間中央'));
+    if (mid && simulationResult.slowSpeedKmh !== undefined) {
+      const pts = simulationResult.slowSpeedPoints;
+      result.events.push({
+        t: mid.time,
+        x: mid.x,
+        y: mid.y + 0.1,
+        text: pts > 0 ? `+${pts}` : `${simulationResult.slowSpeedKmh.toFixed(1)} km/h`,
+        color: pts > 0 ? '#D97706' : '#64748B',
+        kind: 'slow',
+      });
+    }
+
+    // 空中に飛び出したあと
+    const last = traj[traj.length - 1];
+    const prev = traj[traj.length - 2];
+    const pd = simulationResult.projectileData;
+    if (!last || !prev || !pd || simulationResult.tLaunch <= 0 || !last.section.includes('空中')) {
+      return result;
+    }
+    const hit = simulationResult.canHitSuccess;
+    if (hit) {
+      result.events.push({ t: totalTime, x: last.x, y: pd.canYAtHit + 0.12, text: `+${simulationResult.canPoints}`, color: '#E63946', kind: 'hit' });
+    }
+
+    const dtLast = Math.max(1e-4, last.time - prev.time);
+    let bx = last.x;
+    let by = last.y;
+    let bvx = (last.x - prev.x) / dtLast;
+    let bvy = (last.y - prev.y) / dtLast;
+    if (hit) {
+      // 缶にぶつかって、はね返る
+      bvx = -0.25 * bvx;
+      bvy = 0.6;
+    }
+
+    const canSpec = PHYSICS_CONSTANTS.CAN_SPECS[config.canSize];
+    let cx = last.x;
+    let cy = Math.max(canSpec.height / 2, pd.canYAtHit);
+    const onFloorAlready = pd.canYAtHit <= canSpec.height / 2;
+    let cvx = 0;
+    let cvy = onFloorAlready ? 0 : -G * (totalTime - simulationResult.tLaunch);
+    let ca = 0;
+    let cw = 0;
+    if (hit) {
+      // ボールに押されて、回りながら飛ぶ
+      cvx = 0.45 * Math.abs((last.x - prev.x) / dtLast);
+      cvy += 0.4;
+      cw = 7;
+    }
+    let canLanded = onFloorAlready;
+    if (onFloorAlready) result.canLandT = totalTime;
+
+    const dt = 1 / 240;
+    const steps = Math.round(AFTER_SEC / dt);
+    for (let i = 0; i <= steps; i++) {
+      if (i % 2 === 0) {
+        result.ballAfter.push({ x: bx, y: by, a: 0, v: Math.hypot(bvx, bvy) });
+        result.canAfter.push({ x: cx, y: cy, a: ca, v: 0 });
+      }
+      // ボール
+      bvy -= G * dt;
+      bx += bvx * dt;
+      by += bvy * dt;
+      if (by <= 0) {
+        by = 0;
+        if (result.ballLandT < 0) result.ballLandT = totalTime + i * dt;
+        bvy = Math.abs(bvy) > 0.4 ? -bvy * 0.35 : 0;
+        bvx *= 0.75;
+      }
+      if (by === 0 && bvy === 0) bvx *= 0.995;
+
+      // 缶
+      const lying = Math.abs(Math.sin(ca)) > 0.7;
+      const floorC = lying ? canSpec.diameter / 2 : canSpec.height / 2;
+      if (!canLanded || cvy !== 0) {
+        cvy -= G * dt;
+        cy += cvy * dt;
+      }
+      cx += cvx * dt;
+      ca += cw * dt;
+      if (cy <= floorC) {
+        cy = floorC;
+        if (!canLanded) {
+          canLanded = true;
+          if (result.canLandT < 0) result.canLandT = totalTime + i * dt;
+        }
+        cvy = Math.abs(cvy) > 0.5 ? -cvy * 0.2 : 0;
+        cvx *= 0.97;
+        if (hit) {
+          // 横倒しに落ち着く
+          cw = 0;
+          ca += (Math.PI / 2 - ca) * 0.12;
+        }
+      }
+    }
+    result.tail = AFTER_SEC;
+    return result;
+  }, [simulationResult, config.loopType, config.canSize]);
+
+  const effectsRef = useRef(effects);
+  effectsRef.current = effects;
+
+  // 再生を終える時刻（命中・外れのあとの動きを含む）
+  const endTime = (simulationResult?.totalTime || 2.0) + effects.tail;
+
   // --- Canvas 描画本体関数 ---
   const renderCanvas = useCallback(
     (tSec: number) => {
@@ -224,7 +402,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
 
       // スタート台 (0.30m)
       if (showStartPart) {
-        posts.push({ x: curX, y: curY, label: `開始:${Math.round(curY * 100)}` });
+        posts.push({ x: curX, y: curY, label: `スタート ${Math.round(curY * 100)}cm` });
         segments.push({ x1: curX, y1: curY, x2: curX + PHYSICS_CONSTANTS.START_FLAT_LENGTH, y2: curY, type: 'start' });
         curX += PHYSICS_CONSTANTS.START_FLAT_LENGTH;
       }
@@ -263,7 +441,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         curX += slopeDx;
         curY = lc.bottom;
 
-        posts.push({ x: curX, y: curY, label: `L${idx + 1}:${Math.round(curY * 100)}` });
+        posts.push({ x: curX, y: curY, label: `${Math.round(curY * 100)}cm` });
 
         // つなぎレール (0.10m)
         segments.push({ x1: curX, y1: curY, x2: curX + 0.10, y2: curY, type: 'flat' });
@@ -290,7 +468,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         curX += slopeDxSlow;
         curY = config.slowHeight;
 
-        posts.push({ x: curX, y: curY, label: `ゆ:${Math.round(curY * 100)}` });
+        posts.push({ x: curX, y: curY, label: `${Math.round(curY * 100)}cm` });
 
         // ゆっくり区間 (0.50m)
         slowStartX = curX;
@@ -358,7 +536,9 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
       const maxRealY = 1.65;
       const scale = Math.min(plotWidth / maxRealX, plotHeight / maxRealY);
 
-      const toScreenX = (rx: number) => padLeft + rx * scale;
+      // 横に余白があるとき（練習の短いコースなど）は、図を中央に寄せる
+      const offsetX = Math.max(0, (plotWidth - maxRealX * scale) / 2);
+      const toScreenX = (rx: number) => padLeft + offsetX + rx * scale;
       const toScreenY = (ry: number) => height - padBottom - ry * scale;
       const floorY = toScreenY(0);
 
@@ -370,111 +550,70 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         launchTipScreen: { x: toScreenX(launchTipX), y: toScreenY(launchTipY) },
       };
 
-      // 目盛り線
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = '#E2E8F0';
-      ctx.fillStyle = '#64748B';
-      ctx.font = '10px "M PLUS Rounded 1c", sans-serif';
-      ctx.textAlign = 'right';
+      // --- 背景：実験室の壁と床、ものさし ---
+      const isDark = document.documentElement.classList.contains('dark');
+      const palette = { dark: isDark };
+      drawLabScene(ctx, width, height, floorY, palette);
 
-      [0, 0.50, 1.00, 1.50].forEach((h) => {
+      ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(29,43,83,0.07)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 5]);
+      [0.5, 1.0, 1.5].forEach((h) => {
         const sy = toScreenY(h);
         ctx.beginPath();
-        ctx.setLineDash([3, 4]);
-        ctx.moveTo(padLeft - 6, sy);
-        ctx.lineTo(toScreenX(maxRealX), sy);
+        ctx.moveTo(padLeft - 4, sy);
+        ctx.lineTo(width - 6, sy);
         ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillText(`${Math.round(h * 100)}cm`, padLeft - 8, sy + 3);
       });
+      ctx.setLineDash([]);
+      drawMeterStick(ctx, padLeft - 18, toScreenY, 1.6, palette);
 
-      // 床ライン
-      ctx.strokeStyle = '#94A3B8';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(padLeft - 10, floorY);
-      ctx.lineTo(toScreenX(maxRealX) + 10, floorY);
-      ctx.stroke();
+      const simTotal = simulationResult?.totalTime ?? 0;
+      const tLaunchSim = simulationResult?.tLaunch ?? -1;
+      const fx = effectsRef.current;
+      const launchedNow = tLaunchSim > 0 && tSec >= tLaunchSim;
 
-      // 実験用スタンド（台座・支柱・レールをはさむクランプ）
-      const drawStand = (sx: number, syTop: number) => {
-        // 支柱
-        ctx.strokeStyle = '#94A3B8';
-        ctx.lineWidth = 3;
+      // --- スタンド ---
+      const drawTag = (text: string, sxIn: number, sy: number) => {
+        let sx = sxIn;
+        ctx.font = 'bold 9px "M PLUS Rounded 1c", sans-serif';
+        const w = ctx.measureText(text).width + 8;
+        sx = Math.max(padLeft - 4 + w / 2, Math.min(width - 4 - w / 2, sx));
+        ctx.fillStyle = isDark ? 'rgba(14,22,38,0.85)' : 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = isDark ? '#263657' : '#D6DEF0';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(sx, floorY - 3);
-        ctx.lineTo(sx, syTop + 4);
+        ctx.roundRect(sx - w / 2, sy - 9, w, 13, 4);
+        ctx.fill();
         ctx.stroke();
-        // 台座
-        ctx.fillStyle = '#64748B';
-        ctx.beginPath();
-        ctx.roundRect(sx - 11, floorY - 4, 22, 4, 1.5);
-        ctx.fill();
-        // クランプ
-        ctx.fillStyle = '#475569';
-        ctx.beginPath();
-        ctx.roundRect(sx - 4, syTop + 2, 8, 6, 1.5);
-        ctx.fill();
+        ctx.fillStyle = isDark ? '#EAEFFC' : '#1D2B53';
+        ctx.textAlign = 'center';
+        ctx.fillText(text, sx, sy + 1);
       };
 
-      // 支柱
       posts.forEach((p) => {
-        const sx = toScreenX(p.x);
-        const syTop = toScreenY(p.y);
-        drawStand(sx, syTop);
-
-        if (p.label) {
-          ctx.fillStyle = '#1E293B';
-          ctx.font = '9px "M PLUS Rounded 1c", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(p.label, sx, syTop - 7);
-        }
+        drawMetalStand(ctx, toScreenX(p.x), toScreenY(p.y), floorY);
       });
 
       if (showLaunchPart) {
         // 発射台（ジャンプ台）のスタンド：根元と先端の近くの2か所で支える
         const rootX = launchPostX + launchDx * 0.12;
         const tipStandX = launchPostX + launchDx * 0.8;
-        drawStand(toScreenX(rootX), toScreenY(rampYAt(rootX)));
-        drawStand(toScreenX(tipStandX), toScreenY(rampYAt(tipStandX)));
-        ctx.fillStyle = '#1E293B';
-        ctx.font = '9px "M PLUS Rounded 1c", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(
-          `発射台 ${Math.round(config.launchHeight * 100)}cm`,
-          toScreenX(launchPostX + launchDx / 2),
-          toScreenY(rampStartY) + 16
-        );
+        drawMetalStand(ctx, toScreenX(rootX), toScreenY(rampYAt(rootX)), floorY);
+        drawMetalStand(ctx, toScreenX(tipStandX), toScreenY(rampYAt(tipStandX)), floorY);
 
-        // 缶のスタンド：支柱・腕・電磁石
-        const sStandX = toScreenX(canStandX);
-        const sArmY = toScreenY(canArmY);
-        const sMagX = toScreenX(canRealX);
-        ctx.strokeStyle = '#94A3B8';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(sStandX, floorY - 3);
-        ctx.lineTo(sStandX, sArmY);
-        ctx.lineTo(sMagX, sArmY);
-        ctx.stroke();
-        ctx.fillStyle = '#64748B';
-        ctx.beginPath();
-        ctx.roundRect(sStandX - 13, floorY - 4, 26, 4, 1.5);
-        ctx.fill();
-        // 電磁石
-        ctx.fillStyle = '#334155';
-        ctx.beginPath();
-        ctx.roundRect(sMagX - 6, sArmY, 12, 8, 2);
-        ctx.fill();
-        ctx.fillStyle = '#64748B';
+        // 缶のスタンド・腕・電磁石（ボールが飛び出すまで電磁石が缶をつかんでいる）
+        drawCanStand(ctx, toScreenX(canStandX), toScreenY(canArmY), toScreenX(canRealX), floorY, !launchedNow);
+        ctx.fillStyle = isDark ? '#96A6C5' : '#5A6A85';
         ctx.font = '9px "M PLUS Rounded 1c", sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText('電磁石', sMagX - 9, sArmY + 8);
+        ctx.fillText('電磁石', toScreenX(canRealX) - 10, toScreenY(canArmY) + 9);
 
-        // 発射台の先端から缶までの水平距離 1.0 m
+        // 発射台の先端から缶までの水平距離 1.0 m（床の上に寸法線）
         const sTip = toScreenX(launchTipX);
-        const dimY = floorY + 14;
-        ctx.strokeStyle = '#94A3B8';
+        const sMagX = toScreenX(canRealX);
+        const dimY = floorY + 15;
+        ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(60,35,10,0.7)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(sTip, dimY - 4);
@@ -484,108 +623,92 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         ctx.moveTo(sTip, dimY);
         ctx.lineTo(sMagX, dimY);
         ctx.stroke();
-        ctx.fillStyle = '#64748B';
+        ctx.fillStyle = isDark ? 'rgba(255,255,255,0.8)' : 'rgba(60,35,10,0.9)';
+        ctx.font = 'bold 9px "M PLUS Rounded 1c", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('1.0 m', (sTip + sMagX) / 2, dimY - 3);
       }
 
-      // レール
-      ctx.lineWidth = 5;
-      ctx.strokeStyle = '#5AB0F0';
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      segments.forEach((seg) => {
-        ctx.beginPath();
-        ctx.moveTo(toScreenX(seg.x1), toScreenY(seg.y1));
-        ctx.lineTo(toScreenX(seg.x2), toScreenY(seg.y2));
-        ctx.stroke();
-      });
-
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#1D2B53';
-      segments.forEach((seg) => {
-        ctx.beginPath();
-        ctx.moveTo(toScreenX(seg.x1), toScreenY(seg.y1));
-        ctx.lineTo(toScreenX(seg.x2), toScreenY(seg.y2));
-        ctx.stroke();
-      });
-
-      // ループ円
-      loopItems.forEach((loop) => {
-        const scx = toScreenX(loop.centerX);
-        const scy = toScreenY(loop.centerY);
-        const sRadius = loop.radius * scale;
-
-        ctx.beginPath();
-        ctx.arc(scx, scy, sRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = '#5AB0F0';
-        ctx.lineWidth = 5;
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(scx, scy, sRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = '#1D2B53';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.fillStyle = '#64748B';
-        ctx.font = '9px "M PLUS Rounded 1c", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(
-          loop.kind === 'large' ? '大ループ(φ50cm)' : '小ループ(φ30cm)',
-          scx,
-          scy - sRadius - 5
-        );
-      });
-
+      // --- ゆっくり区間の計測区間（黄色い帯） ---
       if (showSlowPart) {
-        // ゆっくり区間
         const sSlowStartX = toScreenX(slowStartX);
         const sSlowEndX = toScreenX(slowStartX + PHYSICS_CONSTANTS.SLOW_FLAT_LENGTH);
         const sSlowY = toScreenY(config.slowHeight);
-
-        ctx.strokeStyle = '#FFC93C';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        ctx.strokeRect(sSlowStartX, sSlowY - 14, sSlowEndX - sSlowStartX, 22);
-        ctx.setLineDash([]);
-
-        ctx.fillStyle = '#D97706';
-        ctx.font = '9px "M PLUS Rounded 1c", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('ゆっくり計測区間 (0.50m)', (sSlowStartX + sSlowEndX) / 2, sSlowY - 18);
+        // 計測区間の床に、黄色い区間の印を置く
+        ctx.fillStyle = isDark ? 'rgba(255,201,60,0.55)' : 'rgba(234,170,0,0.6)';
+        ctx.fillRect(sSlowStartX, sSlowY + 6, sSlowEndX - sSlowStartX, 3);
+        ctx.fillRect(sSlowStartX, sSlowY + 2, 1.5, 8);
+        ctx.fillRect(sSlowEndX - 1.5, sSlowY + 2, 1.5, 8);
       }
 
-      // 発射方向矢印
+      // --- レール（金属） ---
+      strokeMetalRail(
+        ctx,
+        () => {
+          segments.forEach((seg) => {
+            ctx.moveTo(toScreenX(seg.x1), toScreenY(seg.y1));
+            ctx.lineTo(toScreenX(seg.x2), toScreenY(seg.y2));
+          });
+          loopItems.forEach((loop) => {
+            const scx = toScreenX(loop.centerX);
+            const scy = toScreenY(loop.centerY);
+            ctx.moveTo(scx + loop.radius * scale, scy);
+            ctx.arc(scx, scy, loop.radius * scale, 0, Math.PI * 2);
+          });
+        },
+        palette
+      );
+
+      loopItems.forEach((loop) => {
+        const scx = toScreenX(loop.centerX);
+        const scy = toScreenY(loop.centerY);
+        drawTag(loop.kind === 'large' ? '大ループ 直径50cm' : '小ループ 直径30cm', scx, scy - loop.radius * scale - 10);
+      });
+
+      // 支柱の高さの札
+      posts.forEach((p) => {
+        if (p.label) drawTag(p.label, toScreenX(p.x), toScreenY(p.y) - 12);
+      });
+
+      // --- ゆっくり区間の光ゲート（速度計） ---
+      if (showSlowPart) {
+        const midX = slowStartX + PHYSICS_CONSTANTS.SLOW_FLAT_LENGTH / 2;
+        const slowEvent = fx.events.find((e) => e.kind === 'slow');
+        const lit = !!slowEvent && Math.abs(tSec - slowEvent.t) < 0.12;
+        drawPhotogate(ctx, toScreenX(midX), toScreenY(config.slowHeight), lit);
+        if (slowEvent && tSec >= slowEvent.t && simulationResult?.slowSpeedKmh !== undefined) {
+          drawTag(`時速 ${simulationResult.slowSpeedKmh.toFixed(1)} km`, toScreenX(midX), toScreenY(config.slowHeight) - 38);
+        } else {
+          drawTag('ゆっくり区間（速度計）', toScreenX(midX), toScreenY(config.slowHeight) - 38);
+        }
+      }
+
+      // --- 発射の向き（角度の矢印）と照準線 ---
       const sTipX = toScreenX(launchTipX);
       const sTipY = toScreenY(launchTipY);
       const arrowLen = 28;
       const arrowEndX = sTipX + arrowLen * Math.cos(rad);
       const arrowEndY = sTipY - arrowLen * Math.sin(rad);
 
-      if (showLaunchPart) {
-        ctx.strokeStyle = '#E63946';
-        ctx.lineWidth = 2.5;
+      if (showLaunchPart && !launchedNow) {
+        ctx.strokeStyle = 'rgba(230,57,70,0.85)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 3]);
         ctx.beginPath();
         ctx.moveTo(sTipX, sTipY);
         ctx.lineTo(arrowEndX, arrowEndY);
         ctx.stroke();
-
+        ctx.setLineDash([]);
         ctx.fillStyle = '#E63946';
-        ctx.beginPath();
-        ctx.arc(arrowEndX, arrowEndY, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-
         ctx.font = 'bold 10px "M PLUS Rounded 1c", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(`${config.launchAngle}°`, arrowEndX + 4, arrowEndY + 2);
+        ctx.fillText(`${config.launchAngle}°`, arrowEndX + 6, arrowEndY + 2);
       }
 
-      // 照準線
       if (showSightLine && showLaunchPart) {
         const sCanAimX = toScreenX(canRealX);
         const aimY = config.launchHeight + PHYSICS_CONSTANTS.CAN_HORIZONTAL_DISTANCE * Math.tan(rad);
-        ctx.strokeStyle = 'rgba(230, 57, 70, 0.45)';
+        ctx.strokeStyle = 'rgba(230, 57, 70, 0.5)';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
@@ -593,70 +716,95 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         ctx.lineTo(sCanAimX, toScreenY(aimY));
         ctx.stroke();
         ctx.setLineDash([]);
-
-        ctx.fillStyle = 'rgba(230, 57, 70, 0.8)';
+        ctx.fillStyle = 'rgba(230, 57, 70, 0.85)';
         ctx.beginPath();
         ctx.arc(sCanAimX, toScreenY(aimY), 4, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // 現在位置
-      const pos = getPositionAtTime(tSec);
+      // --- 現在の位置 ---
+      const pos = getPositionAtTime(Math.min(tSec, simTotal || tSec));
+      const ballRadius = 6.5;
+      const railGap = ballRadius + 2.5; // レールの上に乗っている球の中心までの距離（画面）
 
-      // 標的缶
-      const sCanX = toScreenX(canRealX);
-      const sCanY = toScreenY(pos.canY);
+      // ボールの画面上の位置（t は時刻）。レールの上では、レールの外側（ループでは内側）に乗せる
+      const ballScreenAt = (t: number): { x: number; y: number; v: number } => {
+        if (simulationResult && t > simTotal && fx.ballAfter.length > 0) {
+          const i = Math.min(fx.ballAfter.length - 1, Math.max(0, Math.round((t - simTotal) * AFTER_RATE)));
+          const b = fx.ballAfter[i];
+          return { x: toScreenX(b.x), y: Math.min(toScreenY(b.y), floorY - ballRadius), v: b.v };
+        }
+        let bp = getPositionAtTime(Math.min(t, simTotal || t)).ball;
+        const airborne = tLaunchSim > 0 && t >= tLaunchSim;
+        if (showLaunchPart && !airborne) {
+          const bx = bp.x;
+          if (bx >= launchPostX - 1e-6 && bx <= launchTipX + 1e-6) {
+            bp = { ...bp, y: rampYAt(bx) };
+          } else if (showStartPart && bx > launchSlopeStartX && bx < launchPostX) {
+            const ratio = (bx - launchSlopeStartX) / (launchPostX - launchSlopeStartX);
+            bp = { ...bp, y: launchSlopeStartY + (rampStartY - launchSlopeStartY) * ratio };
+          }
+        }
+        let sx = toScreenX(bp.x);
+        let sy = toScreenY(bp.y);
+        const loopMatch = /^ループ(\d)(上昇|下降)/.exec(bp.section);
+        if (loopMatch && loopItems[Number(loopMatch[1]) - 1]) {
+          const lp = loopItems[Number(loopMatch[1]) - 1];
+          const cxs = toScreenX(lp.centerX);
+          const cys = toScreenY(lp.centerY);
+          const d = Math.hypot(cxs - sx, cys - sy) || 1;
+          sx += ((cxs - sx) / d) * railGap;
+          sy += ((cys - sy) / d) * railGap;
+        } else {
+          // 飛び出した直後は、レールの上から空中の道すじへなめらかにつなぐ
+          const k = airborne ? Math.max(0, 1 - (t - tLaunchSim) / 0.08) : 1;
+          sy -= railGap * k;
+        }
+        return { x: sx, y: Math.min(sy, floorY - ballRadius), v: bp.v };
+      };
+
+      // 缶の位置（ボールが届くまでは物理の計算どおり。そのあとは演出）
       const canSpec = PHYSICS_CONSTANTS.CAN_SPECS[config.canSize];
       const canPixelW = Math.max(12, canSpec.diameter * scale);
       const canPixelH = Math.max(16, canSpec.height * scale);
+      let canState = { x: canRealX, y: pos.canY, a: 0 };
+      if (simulationResult && tSec > simTotal && fx.canAfter.length > 0) {
+        const i = Math.min(fx.canAfter.length - 1, Math.max(0, Math.round((tSec - simTotal) * AFTER_RATE)));
+        canState = fx.canAfter[i];
+      }
+      const sCanX = toScreenX(canState.x);
+      const sCanY = Math.min(toScreenY(canState.y), floorY - canPixelH / 2);
 
+      // --- 缶 ---
       if (showLaunchPart) {
-        if (!pos.isLaunched) {
-          ctx.strokeStyle = '#94A3B8';
-          ctx.lineWidth = 1.2;
+        drawFloorShadow(ctx, sCanX, floorY, floorY - sCanY, canPixelW / 2 + 2);
+        if (!launchedNow) {
+          // 電磁石から缶までの糸
+          ctx.strokeStyle = isDark ? '#96A6C5' : '#64748B';
+          ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(sCanX, toScreenY(canArmY) + 8);
+          ctx.moveTo(toScreenX(canRealX), toScreenY(canArmY) + 11);
           ctx.lineTo(sCanX, sCanY - canPixelH / 2);
           ctx.stroke();
-        } else {
-          // 発射台を飛び出した瞬間に電磁石/糸が解除され自由落下
-          const tAir = simulationResult && simulationResult.tLaunch > 0 ? Math.max(0, tSec - simulationResult.tLaunch) : 0;
-          if (tAir > 0 && tAir < 0.35 && !pos.isFinished) {
-            ctx.fillStyle = '#E63946';
-            ctx.font = 'bold 9px "M PLUS Rounded 1c", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('▼ 落下開始!', sCanX, sCanY - canPixelH / 2 - 6);
-          }
+        } else if (tSec - tLaunchSim < 0.35 && tSec <= simTotal) {
+          drawTag('▼ 落ちはじめた！', sCanX, sCanY - canPixelH / 2 - 10);
         }
-
-        ctx.fillStyle = '#E63946';
-        ctx.strokeStyle = '#1D2B53';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.roundRect(sCanX - canPixelW / 2, sCanY - canPixelH / 2, canPixelW, canPixelH, 2);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 9px "M PLUS Rounded 1c", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(canSpec.name, sCanX, sCanY + 3);
-
-        ctx.fillStyle = '#64748B';
-        ctx.font = '9px "M PLUS Rounded 1c", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(`缶高: ${Math.round(config.canHeight * 100)}cm`, sCanX + canPixelW / 2 + 4, sCanY);
+        drawCan(ctx, sCanX, sCanY, canPixelW, canPixelH, canState.a, canSpec.name);
+        if (!launchedNow) {
+          ctx.fillStyle = isDark ? '#96A6C5' : '#5A6A85';
+          ctx.font = '9px "M PLUS Rounded 1c", sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(`${Math.round(config.canHeight * 100)}cm`, sCanX + canPixelW / 2 + 4, sCanY + 3);
+        }
       }
 
-      // 弾道軌跡プレビュー
+      // --- 空中の道すじ ---
       if (simulationResult && simulationResult.trajectory.length > 0 && tSec > 0) {
-        const airPoints = simulationResult.trajectory.filter((p) => p.section.includes('空中'));
-        if (airPoints.length > 0) {
-          ctx.strokeStyle = simulationResult.canHitSuccess
-            ? 'rgba(31, 157, 116, 0.4)'
-            : 'rgba(209, 73, 91, 0.4)';
+        const airPoints = simulationResult.trajectory.filter((p) => p.section.includes('空中') && p.time <= tSec);
+        if (airPoints.length > 1) {
+          ctx.strokeStyle = simulationResult.canHitSuccess ? 'rgba(31, 157, 116, 0.55)' : 'rgba(209, 73, 91, 0.55)';
           ctx.lineWidth = 2;
-          ctx.setLineDash([2, 3]);
+          ctx.setLineDash([2, 4]);
           ctx.beginPath();
           ctx.moveTo(toScreenX(airPoints[0].x), toScreenY(airPoints[0].y));
           for (let i = 1; i < airPoints.length; i++) {
@@ -667,41 +815,35 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         }
       }
 
-      // ボール（発射台の坂とジャンプ台の上では、描いたレールの高さに合わせる）
-      let ballPt = pos.ball;
-      if (showLaunchPart && !pos.isLaunched) {
-        const bx = ballPt.x;
-        if (bx >= launchPostX - 1e-6 && bx <= launchTipX + 1e-6) {
-          ballPt = { ...ballPt, y: rampYAt(bx) };
-        } else if (showStartPart && bx > launchSlopeStartX && bx < launchPostX) {
-          const ratio = (bx - launchSlopeStartX) / (launchPostX - launchSlopeStartX);
-          ballPt = { ...ballPt, y: launchSlopeStartY + (rampStartY - launchSlopeStartY) * ratio };
+      // --- ボール：影・速さで色が変わる軌跡・鉄球 ---
+      const ballNow = ballScreenAt(tSec);
+      drawFloorShadow(ctx, ballNow.x, floorY, floorY - ballNow.y, ballRadius);
+      if (tSec > 0) {
+        for (let k = 12; k >= 1; k--) {
+          const tk = tSec - k * 0.025;
+          if (tk < 0) continue;
+          const bk = ballScreenAt(tk);
+          ctx.fillStyle = speedColor(bk.v, 0.4 * (1 - k / 13));
+          ctx.beginPath();
+          ctx.arc(bk.x, bk.y, ballRadius * (1 - k / 16), 0, Math.PI * 2);
+          ctx.fill();
         }
       }
-      const sBallX = toScreenX(ballPt.x);
-      const sBallY = toScreenY(ballPt.y);
-      const ballRadius = 6.5;
+      drawSteelBall(ctx, ballNow.x, ballNow.y, ballRadius);
+      const sBallX = ballNow.x;
+      const sBallY = ballNow.y;
 
-      const ballGrad = ctx.createRadialGradient(
-        sBallX - 2,
-        sBallY - 2,
-        1,
-        sBallX,
-        sBallY,
-        ballRadius
-      );
-      ballGrad.addColorStop(0, '#FFFFFF');
-      ballGrad.addColorStop(0.3, '#94A3B8');
-      ballGrad.addColorStop(0.8, '#475569');
-      ballGrad.addColorStop(1, '#0F172A');
-
-      ctx.fillStyle = ballGrad;
-      ctx.beginPath();
-      ctx.arc(sBallX, sBallY, ballRadius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#1E293B';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+      // --- 点数の吹き出し・命中の火花 ---
+      fx.events.forEach((e) => {
+        const progress = (tSec - e.t) / 1.1;
+        if (e.kind === 'hit') {
+          drawSparks(ctx, sCanX, sCanY, (tSec - e.t) / 0.5);
+          drawPopup(ctx, sCanX, toScreenY(e.y), 'カーン！', (tSec - e.t) / 0.9, '#D97706');
+          drawPopup(ctx, sCanX + 30, toScreenY(e.y) + 4, e.text, progress, e.color);
+        } else if (e.kind === 'loop' || (e.kind === 'slow' && e.text.startsWith('+'))) {
+          drawPopup(ctx, toScreenX(e.x), toScreenY(e.y), e.text, progress, e.color);
+        }
+      });
 
       // --- 10. ドラッグ操作ハンドル (Handles) の構築 & 描画 ---
       if (onUpdateConfig) {
@@ -876,17 +1018,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
           ctx.fillStyle = '#1F9D74';
           ctx.font = 'bold 16px "M PLUS Rounded 1c", sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('🎯 命中!!', sCanX, sCanY - canPixelH / 2 - 14);
-
-          ctx.strokeStyle = '#FFC93C';
-          ctx.lineWidth = 2;
-          for (let a = 0; a < 8; a++) {
-            const ang = (a * Math.PI) / 4;
-            ctx.beginPath();
-            ctx.moveTo(sCanX + 10 * Math.cos(ang), sCanY + 10 * Math.sin(ang));
-            ctx.lineTo(sCanX + 18 * Math.cos(ang), sCanY + 18 * Math.sin(ang));
-            ctx.stroke();
-          }
+          ctx.fillText('🎯 命中!', sCanX, Math.max(18, sCanY - canPixelH / 2 - 16));
         } else if (simulationResult.failReason) {
           ctx.fillStyle = '#D1495B';
           ctx.font = 'bold 12px "M PLUS Rounded 1c", sans-serif';
@@ -914,6 +1046,41 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
     [config, showSightLine, focus, showStartPart, showSlowPart, showLaunchPart, simulationResult, getPositionAtTime, hoveredHandle, onUpdateConfig]
   );
 
+  // --- 効果音：時刻 a から b のあいだに起きたことの音を鳴らす ---
+  const playSoundsBetween = useCallback(
+    (a: number, b: number) => {
+      if (!simulationResult || !sound.isSoundEnabled()) return;
+      const crossed = (t: number) => t > a && t <= b;
+      const fx = effectsRef.current;
+      const tLaunch = simulationResult.tLaunch;
+      const totalTime = simulationResult.totalTime;
+
+      // 転がる音（レールの上にいるあいだ）
+      const onRail = tLaunch > 0 ? b < tLaunch : b < totalTime;
+      if (onRail) {
+        sound.updateRolling(getPositionAtTime(b).ball.v);
+      } else if (a < (tLaunch > 0 ? tLaunch : totalTime)) {
+        sound.stopRolling();
+      }
+
+      simulationResult.trajectory.forEach((p, i) => {
+        const prev = simulationResult.trajectory[i - 1];
+        if (prev && /^ループ\d入口/.test(p.section) && !/^ループ\d入口/.test(prev.section) && crossed(p.time)) {
+          sound.playClick();
+        }
+      });
+      fx.events.forEach((e) => {
+        if (!crossed(e.t)) return;
+        if (e.kind === 'hit') sound.playHit();
+        else if (e.kind === 'loop' || (e.kind === 'slow' && e.text.startsWith('+'))) sound.playScore();
+      });
+      if (tLaunch > 0 && crossed(tLaunch)) sound.playLaunch();
+      if (fx.ballLandT > 0 && crossed(fx.ballLandT)) sound.playThud(0.25);
+      if (fx.canLandT > 0 && crossed(fx.canLandT)) sound.playThud(0.4);
+    },
+    [simulationResult, getPositionAtTime]
+  );
+
   // --- アニメーション再生ループ ---
   const startAnimationLoop = useCallback(() => {
     if (animFrameRef.current) {
@@ -926,6 +1093,8 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
     setAnimStatus('running');
     lastTimestampRef.current = performance.now();
 
+    if (currentTimeSecRef.current <= 0) sound.startRolling();
+
     const loop = (now: number) => {
       if (!isPlayingRef.current) return;
 
@@ -933,15 +1102,18 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
       lastTimestampRef.current = now;
 
       const totalTime = simulationResult?.totalTime || 2.0;
+      const prevT = currentTimeSecRef.current;
       currentTimeSecRef.current += deltaSec * playbackSpeedRef.current;
+      playSoundsBetween(prevT, currentTimeSecRef.current);
 
-      if (currentTimeSecRef.current >= totalTime) {
-        currentTimeSecRef.current = totalTime;
+      if (currentTimeSecRef.current >= endTime) {
+        currentTimeSecRef.current = endTime;
         isPlayingRef.current = false;
         setIsPlaying(false);
         setAnimStatus('finished');
+        sound.stopRolling();
 
-        renderCanvas(totalTime);
+        renderCanvas(endTime);
 
         const finalPos = getPositionAtTime(totalTime);
         setCurrentSectionLabel(finalPos.ball.section);
@@ -963,9 +1135,10 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
     };
 
     animFrameRef.current = requestAnimationFrame(loop);
-  }, [simulationResult, renderCanvas, getPositionAtTime]);
+  }, [simulationResult, renderCanvas, getPositionAtTime, endTime, playSoundsBetween]);
 
   const stopAnimation = useCallback(() => {
+    sound.stopRolling();
     isPlayingRef.current = false;
     setIsPlaying(false);
     if (animFrameRef.current) {
@@ -993,6 +1166,13 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
       onCurrentPointChangeRef.current?.(initPos.ball);
     }
   }, [config, simulationResult, renderCanvas, getPositionAtTime]);
+
+  // ライト／ダークを切り替えたら描き直す（背景を Canvas で描いているため）
+  useEffect(() => {
+    const observer = new MutationObserver(() => renderCanvas(currentTimeSecRef.current));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, [renderCanvas]);
 
   // クリーンアップ
   useEffect(() => {
@@ -1202,13 +1382,27 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
 
-          {/* 再生速度切替 */}
+          {/* 再生速度切替（1倍 → 0.5倍 → 0.25倍のスロー） */}
           <button
-            onClick={() => setPlaybackSpeed((prev) => (prev === 1.0 ? 0.5 : 1.0))}
+            onClick={() => setPlaybackSpeed((prev) => (prev === 1.0 ? 0.5 : prev === 0.5 ? 0.25 : 1.0))}
             className="px-2 py-0.5 rounded text-[11px] font-mono font-bold text-sub hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer"
             title="再生速度"
           >
             {playbackSpeed}x
+          </button>
+
+          {/* 効果音（初期はオフ） */}
+          <button
+            onClick={() => {
+              const next = !soundOn;
+              sound.setSoundEnabled(next);
+              setSoundOn(next);
+            }}
+            className="w-7 h-7 rounded flex items-center justify-center text-sub hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer"
+            title={soundOn ? '効果音をオフにする' : '効果音をオンにする'}
+            aria-label={soundOn ? '効果音をオフにする' : '効果音をオンにする'}
+          >
+            {soundOn ? <Volume2 className="w-3.5 h-3.5 text-[#5AB0F0]" /> : <VolumeX className="w-3.5 h-3.5" />}
           </button>
         </div>
 
