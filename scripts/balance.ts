@@ -52,7 +52,7 @@ interface Design {
   concept: { ideal: number; average: number; success: number; rail: number };
 }
 
-const designs: Design[] = [
+const designList: Design[] = [
   {
     name: 'ループなし・ゆっくり145・小さい缶140',
     config: { ...base },
@@ -60,12 +60,12 @@ const designs: Design[] = [
   },
   {
     name: '大ループだけ・ゆっくり区間はあきらめる',
-    config: { ...base, loopType: 'large', loop1Bottom: 0.6, slowHeight: 0.6, launchHeight: 0.7, launchAngle: 35 },
+    config: { ...base, loopType: 'large', loop1Bottom: 0.6, slowHeight: 0.6, launchHeight: 0.7 },
     concept: { rail: 4.9, ideal: 110, average: 91, success: 77 },
   },
   {
     name: '小ループだけ・ゆっくり140・中の缶140',
-    config: { ...base, loopType: 'small', loop1Bottom: 1.0, slowHeight: 1.4, canSize: 'medium' },
+    config: { ...base, loopType: 'small', loop1Bottom: 1.0, slowHeight: 1.4, launchHeight: 0.6, canSize: 'medium' },
     concept: { rail: 5.2, ideal: 108, average: 102, success: 91 },
   },
   {
@@ -77,7 +77,6 @@ const designs: Design[] = [
       loop2Bottom: 0.6,
       slowHeight: 0.6,
       launchHeight: 0.6,
-      launchAngle: 40,
       canSize: 'medium',
     },
     concept: { rail: 5.8, ideal: 110, average: 104, success: 91 },
@@ -88,6 +87,12 @@ const designs: Design[] = [
     concept: { rail: 8.6, ideal: 158, average: 93, success: 42 },
   },
 ];
+
+// 発射の角度は、どの設計も缶の中心へまっすぐ向ける
+const designs: Design[] = designList.map((d) => ({
+  ...d,
+  config: { ...d.config, launchAngle: aimAngle(d.config.launchHeight, d.config.canHeight) },
+}));
 
 function runMany(config: CourseConfig, runs: number, seed: number) {
   const original = Math.random;

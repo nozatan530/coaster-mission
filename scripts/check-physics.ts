@@ -32,7 +32,8 @@ const base: CourseConfig = {
   loop2Bottom: 1.0,
   slowHeight: 1.45,
   launchHeight: 0.8,
-  launchAngle: 31,
+  // 140 cm の缶は 1.40 m 先。発射台 80 cm から缶の中心へ向ける角度は atan(0.6 / 1.4) ≒ 23°
+  launchAngle: 23,
   canSize: 'small',
   canHeight: 1.4,
   motionType: 'rolling',
@@ -40,16 +41,17 @@ const base: CourseConfig = {
 
 const cases: Case[] = [
   {
-    name: 'A ループなし・ゆっくり145cm・小さい缶140cm',
+    name: 'A ループなし・ゆっくり145cm・発射台80cm 23°・小さい缶140cm',
     config: { ...base },
     expected: { rail: 2.5, exceeded: false, scores: { loop: 0, slow: 22, can: 80, total: 102 } },
   },
   {
-    name: 'B 小ループ(100cm)・ゆっくり140cm・中の缶140cm',
-    config: { ...base, loopType: 'small', loop1Bottom: 1.0, slowHeight: 1.4, canSize: 'medium' },
+    name: 'B 小ループ(100cm)・ゆっくり140cm・発射台60cm 30°・中の缶140cm',
+    // 発射台 80 cm では速さが足りず、1.40 m 先の缶が先に床に落ちる。60 cm に下げて速さを稼ぐ
+    config: { ...base, loopType: 'small', loop1Bottom: 1.0, slowHeight: 1.4, launchHeight: 0.6, launchAngle: 30, canSize: 'medium' },
     // ゆっくり区間の中央は 2.2514 km/h で、四捨五入の境目（2.25 km/h）に乗る。
     // 2.3 km/h → 27点が正しい（当初の試算 28点・合計108点は、境目の反対側に出た値）
-    expected: { rail: 5.2, exceeded: false, scores: { loop: 10, slow: 27, can: 70, total: 107 } },
+    expected: { rail: 5.64, exceeded: false, scores: { loop: 10, slow: 27, can: 70, total: 107 } },
   },
   {
     name: 'C 大(50cm)→小(50cm)・ゆっくり130cm・小さい缶',
