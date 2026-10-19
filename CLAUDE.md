@@ -35,7 +35,7 @@
 - 依存の導入: `npm install`
 - 開発サーバー: `npm run dev`（http://localhost:3000）
 - 型チェック: `npm run lint`（`tsc --noEmit`）
-- テスト: なし（物理の確認は `docs/studio-prompt.md` の「計算の確認用」3設計で行う）
+- 物理の確認（テストの代わり）: `npm run check:physics`（`docs/studio-prompt.md` の「計算の確認用」3設計と照合。ずれがあると終了コード1）
 - ビルド: `npm run build`（`dist/` に出力）／確認 `npm run preview`
 
 ## 技術スタック
