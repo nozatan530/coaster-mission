@@ -54,6 +54,7 @@ export const StageHistory: React.FC<StageHistoryProps> = ({
                 <tr className="border-b border-[#D6DEF0] dark:border-[#263657] text-sub bg-slate-50/60 dark:bg-slate-900/40">
                   <th className="py-2.5 px-3 font-bold w-12 text-center">回</th>
                   <th className="py-2.5 px-3 font-bold min-w-[220px]">コース設計の要点</th>
+                  <th className="py-2.5 px-3 font-bold w-24 text-center">予想</th>
                   <th className="py-2.5 px-3 font-bold w-20 text-center">理想得点</th>
                   <th className="py-2.5 px-3 font-bold w-24 text-center">平均点</th>
                   <th className="py-2.5 px-3 font-bold w-20 text-center">成功率</th>
@@ -73,6 +74,10 @@ export const StageHistory: React.FC<StageHistoryProps> = ({
 
                     <td className="py-3 px-3 font-mono text-[11px] text-[#1D2B53] dark:text-[#EAEFFC]">
                       {entry.configSummary}
+                    </td>
+
+                    <td className="py-3 px-3 text-center text-[11px] text-sub">
+                      {entry.predictedScore ?? '—'}
                     </td>
 
                     <td className="py-3 px-3 text-center font-mono font-bold text-sub">

@@ -21,6 +21,7 @@ const STORAGE_KEYS = {
   HISTORY: 'ball_coaster_history',
   REPORT: 'ball_coaster_report',
   THEME: 'ball_coaster_theme',
+  DESIGN_DRAFT: 'ball_coaster_design_draft', // 本番画面で書きかけの予想得点と理由
 };
 
 // デフォルトコース設定

@@ -22,6 +22,7 @@ import {
   PHYSICS_CONSTANTS,
   FAIL_REASON_LABELS,
 } from '../physics';
+import { STORAGE_KEYS, safeGetStorage, safeSetStorage } from '../storage';
 import {
   Play,
   RotateCw,
@@ -83,8 +84,16 @@ export const StageDesign: React.FC<StageDesignProps> = ({
   const hasRunThisDesign = ranKey === configKey;
 
   // 変更理由メモ入力
-  const [noteInput, setNoteInput] = useState('');
-  const [predictedScoreInput, setPredictedScoreInput] = useState('');
+  // 書きかけは端末に保存し、タブを切り替えても消えないようにする
+  const [noteInput, setNoteInput] = useState(
+    () => safeGetStorage(STORAGE_KEYS.DESIGN_DRAFT, { predicted: '', note: '' }).note
+  );
+  const [predictedScoreInput, setPredictedScoreInput] = useState(
+    () => safeGetStorage(STORAGE_KEYS.DESIGN_DRAFT, { predicted: '', note: '' }).predicted
+  );
+  useEffect(() => {
+    safeSetStorage(STORAGE_KEYS.DESIGN_DRAFT, { predicted: predictedScoreInput, note: noteInput });
+  }, [predictedScoreInput, noteInput]);
   const [showDetailRail, setShowDetailRail] = useState(false);
 
   // 単発走らせる（理想）
@@ -140,8 +149,12 @@ export const StageDesign: React.FC<StageDesignProps> = ({
       idealScore: batch.idealResult.totalScore,
       averageScore: batch.averageScore,
       successRate: batch.successRate,
+      predictedScore: predictedScoreInput.trim() || '（無記入）',
       notes: noteInput.trim() || '（無記入）',
     });
+    // 記録したら、次の設計のために予想と理由の欄を空にする
+    setPredictedScoreInput('');
+    setNoteInput('');
   };
 
   // ヘルパー：部分更新

@@ -129,6 +129,7 @@ export interface TrialHistoryEntry {
   idealScore: number;
   averageScore: number;
   successRate: number;
+  predictedScore?: string; // 走らせる前に書いた予想得点（この欄ができる前の記録にはない）
   notes: string;
 }
 

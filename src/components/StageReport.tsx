@@ -166,7 +166,7 @@ ${
     ? historyEntries
         .map(
           (h) =>
-            `#${h.trialNumber} | 理想:${h.idealScore}点 | 平均:${h.averageScore}点 | 成功率:${h.successRate}% | メモ:${h.notes}`
+            `#${h.trialNumber} | 予想:${h.predictedScore ?? '—'} | 理想:${h.idealScore}点 | 平均:${h.averageScore}点 | 成功率:${h.successRate}% | メモ:${h.notes}`
         )
         .join('\n')
     : ''
@@ -422,6 +422,7 @@ ${reportState.reflection.q3 || '（未記入）'}
                   <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 font-bold text-sub">
                     <th className="p-2 w-8 text-center">回</th>
                     <th className="p-2">設計要点</th>
+                    <th className="p-2 text-center w-16">予想</th>
                     <th className="p-2 text-center w-16">理想</th>
                     <th className="p-2 text-center w-16">平均点</th>
                     <th className="p-2 text-center w-16">成功率</th>
@@ -433,6 +434,7 @@ ${reportState.reflection.q3 || '（未記入）'}
                     <tr key={h.id}>
                       <td className="p-2 text-center font-bold font-mono">#{h.trialNumber}</td>
                       <td className="p-2 font-mono text-[10px]">{h.configSummary}</td>
+                      <td className="p-2 text-center">{h.predictedScore ?? '—'}</td>
                       <td className="p-2 text-center font-mono">{h.idealScore}点</td>
                       <td className="p-2 text-center font-mono font-bold text-[#1F9D74]">
                         {h.averageScore}点
