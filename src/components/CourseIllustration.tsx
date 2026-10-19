@@ -11,6 +11,8 @@ import { PHYSICS_CONSTANTS, simulateRun } from '../physics';
 interface CourseIllustrationProps {
   config: CourseConfig;
   showLabels?: boolean;
+  // false にすると、飛ぶ道すじと缶の落ちる位置を描かない（走らせる前に結果がわからないように）
+  showFlight?: boolean;
   className?: string;
 }
 
@@ -30,6 +32,7 @@ interface Segment {
 export const CourseIllustration: React.FC<CourseIllustrationProps> = ({
   config,
   showLabels = true,
+  showFlight = true,
   className = '',
 }) => {
   const layout = useMemo(() => {
@@ -101,7 +104,7 @@ export const CourseIllustration: React.FC<CourseIllustrationProps> = ({
     // 飛んでいく道すじ（理想の1回の発射の速さから描く）
     const result = simulateRun(config, { isIdeal: true });
     const arc: { x: number; h: number }[] = [];
-    if (result.speeds.launchTip > 0 && result.tLaunch >= 0) {
+    if (showFlight && result.speeds.launchTip > 0 && result.tLaunch >= 0) {
       const v = result.speeds.launchTip;
       const th = (config.launchAngle * Math.PI) / 180;
       const g = PHYSICS_CONSTANTS.G;
@@ -116,7 +119,7 @@ export const CourseIllustration: React.FC<CourseIllustrationProps> = ({
 
     // 当たったときは、缶が落ちて出会う位置（缶の中心の高さ）も描く
     const canHitH =
-      result.projectileData?.isHit && result.projectileData.canYAtHit > 0
+      showFlight && result.projectileData?.isHit && result.projectileData.canYAtHit > 0
         ? result.projectileData.canYAtHit
         : null;
 
@@ -135,7 +138,7 @@ export const CourseIllustration: React.FC<CourseIllustrationProps> = ({
       width: canX + 0.25,
       maxH: maxH + (showLabels ? 0.3 : 0.12),
     };
-  }, [config, showLabels]);
+  }, [config, showLabels, showFlight]);
 
   const pad = 20;
   const W = layout.width * SCALE + pad * 2;

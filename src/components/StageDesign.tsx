@@ -14,6 +14,7 @@ import {
   TrajectoryPoint,
 } from '../types';
 import { CourseCanvas } from './CourseCanvas';
+import { CourseIllustration } from './CourseIllustration';
 import { EnergyBarChart } from './EnergyBarChart';
 import {
   calculateRailUsage,
@@ -504,6 +505,22 @@ export const StageDesign: React.FC<StageDesignProps> = ({
 
       {/* コース設計パラメータ調整パネル */}
       <div className="bg-white dark:bg-[#17223B] border border-[#D6DEF0] dark:border-[#263657] rounded-2xl p-5 shadow-xs space-y-5">
+        {/* スマホ・タブレット：操作欄の上に小さなコース図と残りのレールを貼り付け、変えた結果をその場で見せる */}
+        <div
+          className="lg:hidden sticky z-20 -mx-5 -mt-5 px-3 pt-2 pb-1.5 rounded-t-2xl bg-white/95 dark:bg-[#17223B]/95 backdrop-blur-sm border-b border-[#D6DEF0] dark:border-[#263657]"
+          style={{ top: 'var(--header-h, 100px)' }}
+        >
+          <div className="flex items-center justify-between text-[11px] font-bold mb-0.5">
+            <span className="text-sub">いまのコース</span>
+            <span className={railInfo.isExceeded ? 'text-[#E63946]' : 'text-[#1F9D74]'}>
+              {railInfo.isExceeded
+                ? `レール ${railInfo.excess.toFixed(2)} m 超過`
+                : `残りのレール ${railInfo.remaining.toFixed(2)} m`}
+            </span>
+          </div>
+          <CourseIllustration config={config} showLabels={false} showFlight={false} className="max-h-24" />
+        </div>
+
         <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
           <Sliders className="w-4 h-4 text-[#5AB0F0]" />
           <h3 className="text-base font-bold text-[#1D2B53] dark:text-[#EAEFFC]">

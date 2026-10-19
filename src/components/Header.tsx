@@ -2,7 +2,7 @@
  * ヘッダー & ナビゲーションバー
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Compass,
   PlayCircle,
@@ -35,6 +35,19 @@ export const Header: React.FC<HeaderProps> = ({
   canProceedToPractice,
 }) => {
   const [showResetModal, setShowResetModal] = useState(false);
+
+  // 見出しの高さを CSS 変数 --header-h に入れる（画面に貼り付ける部品が、見出しの下に並ぶように）
+  const headerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const update = () =>
+      document.documentElement.style.setProperty('--header-h', `${Math.ceil(el.getBoundingClientRect().height)}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   // 鍵のかかったタブを押したときに、理由を少しのあいだ見せる
   const [showLockedNotice, setShowLockedNotice] = useState(false);
   const lockedTimerRef = useRef<number | null>(null);
@@ -74,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="no-print sticky top-0 z-40 bg-white/95 dark:bg-[#17223B]/95 backdrop-blur-md border-b border-[#D6DEF0] dark:border-[#263657] shadow-xs">
+      <header ref={headerRef} className="no-print sticky top-0 z-40 bg-white/95 dark:bg-[#17223B]/95 backdrop-blur-md border-b border-[#D6DEF0] dark:border-[#263657] shadow-xs">
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
           {/* ロゴ & タイトル */}
           <div className="flex items-center gap-2.5">
