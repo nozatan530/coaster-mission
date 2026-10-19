@@ -37,7 +37,7 @@ interface StageReportProps {
 }
 
 export const StageReport: React.FC<StageReportProps> = ({
-  config,
+  config: currentConfig,
   reportState,
   p1State,
   p2State,
@@ -47,15 +47,18 @@ export const StageReport: React.FC<StageReportProps> = ({
 }) => {
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // レール情報と理想計算
-  const railInfo = useMemo(() => calculateRailUsage(config), [config]);
-  const idealSim = useMemo(() => simulateRun(config, { isIdeal: true }), [config]);
-
   // ベスト記録の算出
   const bestEntry = useMemo(() => {
     if (historyEntries.length === 0) return null;
     return [...historyEntries].sort((a, b) => b.averageScore - a.averageScore)[0];
   }, [historyEntries]);
+
+  // レポートの「最終設計」は、10回連続の平均点がいちばん高かった設計。まだ記録がなければ今の設計
+  const config = bestEntry?.config ?? currentConfig;
+
+  // レール情報と理想計算
+  const railInfo = useMemo(() => calculateRailUsage(config), [config]);
+  const idealSim = useMemo(() => simulateRun(config, { isIdeal: true }), [config]);
 
   // 未入力チェック
   const checklist = useMemo(() => {
@@ -143,7 +146,7 @@ export const StageReport: React.FC<StageReportProps> = ({
 ・Q3 (缶当ての照準): ${p3State.answer || '（未記入）'}
   [ヒント参照: ${p3HintsCount}/3段階]
 
-■ 3. 最終コース設計
+■ 3. 最終コース設計（${bestEntry ? `10回連続の平均点がいちばん高かった設計 #${bestEntry.trialNumber}` : 'まだ10回連続をしていないため、いまの設計'}）
 ・スタート高さ: ${Math.round(config.startHeight * 100)} cm
 ・ループ: ${loopDesc}
 ・ゆっくり区間高さ: ${Math.round(config.slowHeight * 100)} cm
@@ -286,6 +289,11 @@ ${reportState.reflection.q3 || '（未記入）'}
             <FileText className="w-4 h-4 text-[#5AB0F0]" />
             <span>2. 最終コース設計</span>
           </h3>
+          <p className="text-[11px] text-sub">
+            {bestEntry
+              ? `10回連続の平均点がいちばん高かった設計（記録表の #${bestEntry.trialNumber}）`
+              : 'まだ10回連続を走らせていないため、いまの設計を表示しています'}
+          </p>
 
           <div className="rounded-xl overflow-hidden border border-[#D6DEF0] dark:border-[#263657]">
             <CourseCanvas config={config} isAnimating={false} className="border-none shadow-none" />
