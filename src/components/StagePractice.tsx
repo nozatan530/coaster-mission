@@ -315,7 +315,9 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
                 <div className="flex justify-between">
                   <span className="text-sub">頂上での速度:</span>
                   <span className="font-bold font-mono">
-                    {simResult.speeds.loop1Top !== undefined
+                    {simResult.failReason === 'loop_fall'
+                      ? '頂上まで届かない'
+                      : simResult.speeds.loop1Top !== undefined
                       ? `${simResult.speeds.loop1Top.toFixed(2)} m/s`
                       : '到達できず'}
                   </span>
@@ -336,7 +338,7 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
                     </span>
                   ) : (
                     <span className="text-[#E63946] font-bold flex items-center gap-1">
-                      <XCircle className="w-4 h-4" /> 頂上で落下
+                      <XCircle className="w-4 h-4" /> ループで落下
                     </span>
                   )}
                 </div>

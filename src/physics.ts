@@ -287,9 +287,10 @@ export function simulateRun(
 
   const trajectory: TrajectoryPoint[] = [];
 
-  function addPoint(x: number, y: number, v: number, section: string, dt = 0) {
+  // kOverride：空中で回転のエネルギーが残るときなど、K を直接決める
+  function addPoint(x: number, y: number, v: number, section: string, dt = 0, kOverride?: number) {
     currentTime += dt;
-    const K = factor * v * v;
+    const K = kOverride ?? factor * v * v;
     const U = PHYSICS_CONSTANTS.G * y;
     trajectory.push({
       x,
@@ -484,17 +485,17 @@ export function simulateRun(
     T += collisionLoss;
 
     // 4) ループ前半（最下点 -> 頂上）：半径 r, 円弧 π r
+    const G = PHYSICS_CONSTANTS.G;
     const r = loop.radius;
     const halfArc = Math.PI * r;
     const climbHeight = 2 * r;
-    const lossHalf = PHYSICS_CONSTANTS.G * mu * halfArc;
+    const lossHalf = G * mu * halfArc;
 
-    const eTop = E - PHYSICS_CONSTANTS.G * climbHeight - lossHalf;
-    T += lossHalf;
+    const eTop = E - G * climbHeight - lossHalf;
 
     const vTopSq = eTop > 0 ? eTop / factor : 0;
     const vTop = Math.sqrt(Math.max(0, vTopSq));
-    const critSq = PHYSICS_CONSTANTS.G * r; // v^2 >= g * r
+    const critSq = G * r; // v^2 >= g * r
 
     if (idx === 0) {
       speedsRecord.loop1Top = vTop;
@@ -504,49 +505,112 @@ export function simulateRun(
       speedsRecord.loop2TopCrit = Math.sqrt(critSq);
     }
 
-    // 頂上までの円弧アニメーション軌跡
-    // 円の中心は (currentX, loop.bottom + r)
+    // ループ頂上の通過判定：v^2 >= g * r（得点の判定はこの条件だけで決める）
+    const passesTop = !(vTopSq < critSq || eTop <= 0);
+
+    // 円の中心は (currentX, loop.bottom + r)。phi は最下点から回った角度
     const cx = currentX;
     const cy = loop.bottom + r;
-    const loopSteps = 16;
+    const pointAt = (phi: number) => ({
+      x: cx + r * Math.sin(phi),
+      y: cy - r * Math.cos(phi),
+    });
+    const eBottom = E;
+    const tBottom = T;
+    // 最下点から角度 phi まで回ったときの運動エネルギー/m と、そこまでの摩擦の熱
+    const energyAt = (phi: number) => eBottom - G * r * (1 - Math.cos(phi)) - G * mu * r * phi;
 
-    for (let s = 1; s <= loopSteps / 2; s++) {
-      // 角度: -π/2 (最下点) -> π/2 (頂上)
-      const angle = -Math.PI / 2 + (Math.PI * s) / (loopSteps / 2);
-      const lx = cx + r * Math.cos(angle);
-      const ly = cy + r * Math.sin(angle);
-      const frac = s / (loopSteps / 2);
-      const curE = E - (E - eTop) * frac;
-      const curV = curE > 0 ? Math.sqrt(curE / factor) : 0;
-      const stepArc = halfArc / (loopSteps / 2);
-      addPoint(lx, ly, curV, `ループ${loopNum}上昇`, stepArc / Math.max(0.2, curV));
+    // 通過するときは粗く、落ちるときは離れる点を見つけるため細かく刻む
+    const climbSteps = passesTop ? 8 : 60;
+    let lastPhi = 0;
+    for (let s = 1; s <= climbSteps; s++) {
+      const phi = (Math.PI * s) / climbSteps;
+      const eHere = energyAt(phi);
+      if (!passesTop) {
+        // 途中で止まる（速さが 0）か、レールから離れる（垂直抗力が 0：v²/r + g cosφ < 0）
+        if (eHere <= 0 || eHere / factor / r + G * Math.cos(phi) < 0) break;
+      }
+      T = tBottom + G * mu * r * phi;
+      E = eHere;
+      const p = pointAt(phi);
+      const v = Math.sqrt(Math.max(0, eHere) / factor);
+      addPoint(p.x, p.y, v, `ループ${loopNum}上昇`, (halfArc / climbSteps) / Math.max(0.2, v));
+      lastPhi = phi;
     }
 
-    // ループ頂上の通過判定：v^2 >= g * r
-    if (vTopSq < critSq || eTop <= 0) {
+    if (!passesTop) {
+      const pLast = pointAt(lastPhi);
+      const vLast = Math.sqrt(Math.max(0, E) / factor);
+
+      if (lastPhi <= Math.PI / 2 || vLast < 0.05) {
+        // 半分の高さまで登れずに止まり、坂を戻る（見た目用）
+        const backSteps = Math.max(2, Math.round((lastPhi / Math.PI) * 30));
+        for (let s = 1; s <= backSteps; s++) {
+          const phi = lastPhi * (1 - s / backSteps);
+          const back = lastPhi - phi;
+          const eBack = Math.max(0, E + G * r * (Math.cos(phi) - Math.cos(lastPhi)) - G * mu * r * back);
+          const tBack = T + G * mu * r * back;
+          const p = pointAt(phi);
+          const v = Math.sqrt(eBack / factor);
+          const prevT = T;
+          T = tBack;
+          addPoint(p.x, p.y, v, `ループ${loopNum}戻り`, (r * (lastPhi / backSteps)) / Math.max(0.2, v));
+          T = prevT;
+        }
+        T = T + G * mu * r * lastPhi;
+        return makeResult({
+          failReason: 'loop_fall',
+          failDescription: `ループ${loopNum}を半分の高さ（${Math.round((loop.bottom + r) * 100)} cm）まで登れずに止まり、戻ってしまいました（頂上を回るには、頂上で ${Math.sqrt(critSq).toFixed(2)} m/s 以上の速さが必要）`,
+          failedAt: `ループ${loopNum}`,
+        });
+      }
+
+      // レールから離れて、ループの内側を落ちる（見た目用。回転のエネルギーはそのまま残る）
+      const angle = lastPhi;
+      let fx = pLast.x;
+      let fy = pLast.y;
+      let fvx = vLast * Math.cos(angle);
+      let fvy = vLast * Math.sin(angle);
+      const eRot = (factor - 0.5) * vLast * vLast;
+      const totalAtLeave = E + G * pLast.y + T;
+      const dtFall = 0.01;
+      for (let s = 1; s <= 150; s++) {
+        fvy -= G * dtFall;
+        fx += fvx * dtFall;
+        fy += fvy * dtFall;
+        const speed = Math.hypot(fvx, fvy);
+        const dist = Math.hypot(fx - cx, fy - cy);
+        if ((s * dtFall > 0.03 && dist >= r) || fy <= loop.bottom) {
+          // レールにぶつかる
+          const k = r / Math.max(dist, 1e-6);
+          fx = cx + (fx - cx) * Math.min(1, k);
+          fy = Math.max(loop.bottom, cy + (fy - cy) * Math.min(1, k));
+          addPoint(fx, fy, speed, `ループ${loopNum}落下`, dtFall, eRot + 0.5 * speed * speed);
+          break;
+        }
+        addPoint(fx, fy, speed, `ループ${loopNum}落下`, dtFall, eRot + 0.5 * speed * speed);
+      }
+      // ぶつかったあと、ループの底に落ち着く（衝突で失ったぶんは熱など T に入れる）
+      T = totalAtLeave - G * loop.bottom;
+      addPoint(cx, loop.bottom, 0, `ループ${loopNum}落下`, 0.3);
       return makeResult({
         failReason: 'loop_fall',
-        failDescription: `ループ${loopNum}の頂上で速度が足りず、落下しました（頂上速度: ${vTop.toFixed(2)} m/s, 必要速度: ${Math.sqrt(critSq).toFixed(2)} m/s）`,
-        failedAt: `ループ${loopNum}頂上`,
+        failDescription: `ループ${loopNum}の途中（高さ ${Math.round(pLast.y * 100)} cm）でレールから離れて落ちました（頂上を回るには、頂上で ${Math.sqrt(critSq).toFixed(2)} m/s 以上の速さが必要）`,
+        failedAt: `ループ${loopNum}`,
       });
     }
 
     // 5) ループ後半（頂上 -> 最下点）
-    const downGain = PHYSICS_CONSTANTS.G * climbHeight;
-    const lossSecondHalf = PHYSICS_CONSTANTS.G * mu * halfArc;
-    E = eTop + downGain - lossSecondHalf;
-    T += lossSecondHalf;
-
-    for (let s = 1; s <= loopSteps / 2; s++) {
-      // 角度: π/2 (頂上) -> 3π/2 (最下点)
-      const angle = Math.PI / 2 + (Math.PI * s) / (loopSteps / 2);
-      const lx = cx + r * Math.cos(angle);
-      const ly = cy + r * Math.sin(angle);
-      const frac = s / (loopSteps / 2);
-      const curE = eTop + (E - eTop) * frac;
-      const curV = curE > 0 ? Math.sqrt(curE / factor) : 0;
-      const stepArc = halfArc / (loopSteps / 2);
-      addPoint(lx, ly, curV, `ループ${loopNum}下降`, stepArc / Math.max(0.2, curV));
+    const tTop = T;
+    const descendSteps = 8;
+    for (let s = 1; s <= descendSteps; s++) {
+      const psi = (Math.PI * s) / descendSteps; // 頂上から回った角度
+      const eHere = eTop + G * r * (1 - Math.cos(psi)) - G * mu * r * psi;
+      T = tTop + G * mu * r * psi;
+      E = eHere;
+      const p = pointAt(Math.PI + psi);
+      const v = Math.sqrt(Math.max(0, eHere) / factor);
+      addPoint(p.x, p.y, v, `ループ${loopNum}下降`, (halfArc / descendSteps) / Math.max(0.2, v));
     }
 
     // 6) ループ出口つなぎレール (0.10m 平坦)

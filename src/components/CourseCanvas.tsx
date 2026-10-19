@@ -747,7 +747,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         }
         let sx = toScreenX(bp.x);
         let sy = toScreenY(bp.y);
-        const loopMatch = /^ループ(\d)(上昇|下降)/.exec(bp.section);
+        const loopMatch = /^ループ(\d)(上昇|下降|戻り)/.exec(bp.section);
         if (loopMatch && loopItems[Number(loopMatch[1]) - 1]) {
           const lp = loopItems[Number(loopMatch[1]) - 1];
           const cxs = toScreenX(lp.centerX);
@@ -755,7 +755,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
           const d = Math.hypot(cxs - sx, cys - sy) || 1;
           sx += ((cxs - sx) / d) * railGap;
           sy += ((cys - sy) / d) * railGap;
-        } else {
+        } else if (!/^ループ\d落下/.test(bp.section)) {
           // 飛び出した直後は、レールの上から空中の道すじへなめらかにつなぐ
           const k = airborne ? Math.max(0, 1 - (t - tLaunchSim) / 0.08) : 1;
           sy -= railGap * k;
@@ -1025,7 +1025,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
           ctx.textAlign = 'center';
           const label =
             simulationResult.failReason === 'loop_fall'
-              ? '⚠️ ループ頂上で落下!'
+              ? '⚠️ ループで落下!'
               : simulationResult.failReason === 'slow_stop'
               ? '⚠️ 途中で停止!'
               : simulationResult.failReason === 'slope_rollback'
