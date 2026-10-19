@@ -152,6 +152,16 @@ export default function App() {
   };
 
   // ログから設計を復元
+  // 設計の更新はここを通す。スタートを下げたとき、ループの最下点がスタートより高いまま残らないようにする
+  const handleUpdateConfig = (next: CourseConfig) => {
+    const maxBottom = Math.max(0.1, Math.round((next.startHeight - 0.1) * 100) / 100);
+    setConfig({
+      ...next,
+      loop1Bottom: Math.min(next.loop1Bottom, maxBottom),
+      loop2Bottom: Math.min(next.loop2Bottom, maxBottom),
+    });
+  };
+
   const handleLoadConfig = (savedConfig: CourseConfig) => {
     setConfig({ ...savedConfig });
     setCurrentStage('design');
@@ -192,7 +202,7 @@ export default function App() {
         {currentStage === 'design' && (
           <StageDesign
             config={config}
-            onUpdateConfig={setConfig}
+            onUpdateConfig={handleUpdateConfig}
             onAddHistory={handleAddHistory}
             historyEntries={historyEntries}
           />
