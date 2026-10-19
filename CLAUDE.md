@@ -36,6 +36,7 @@
 - 開発サーバー: `npm run dev`（http://localhost:3000）
 - 型チェック: `npm run lint`（`tsc --noEmit`）
 - 物理の確認（テストの代わり）: `npm run check:physics`（`docs/studio-prompt.md` の「計算の確認用」3設計と照合。ずれがあると終了コード1）
+- バランス試算: `npm run balance`（代表5設計を1設計1,000回。回数は `npm run balance -- 3000`。結果のまとめは `docs/balance.md`）
 - ビルド: `npm run build`（`dist/` に出力）／確認 `npm run preview`
 
 ## 技術スタック

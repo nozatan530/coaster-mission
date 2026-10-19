@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "check:physics": "tsx scripts/check-physics.ts"
+    "check:physics": "tsx scripts/check-physics.ts",
+    "balance": "tsx scripts/balance.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
