@@ -2,7 +2,7 @@
  * ヘッダー & ナビゲーションバー
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Compass,
   PlayCircle,
@@ -12,6 +12,7 @@ import {
   Moon,
   ListOrdered,
   BookOpen,
+  Lock,
 } from 'lucide-react';
 
 export type StageId = 'start' | 'practice' | 'design' | 'history' | 'report';
@@ -34,6 +35,14 @@ export const Header: React.FC<HeaderProps> = ({
   canProceedToPractice,
 }) => {
   const [showResetModal, setShowResetModal] = useState(false);
+  // 鍵のかかったタブを押したときに、理由を少しのあいだ見せる
+  const [showLockedNotice, setShowLockedNotice] = useState(false);
+  const lockedTimerRef = useRef<number | null>(null);
+  const handleLockedClick = () => {
+    setShowLockedNotice(true);
+    if (lockedTimerRef.current) window.clearTimeout(lockedTimerRef.current);
+    lockedTimerRef.current = window.setTimeout(() => setShowLockedNotice(false), 4000);
+  };
 
   const stages: { id: StageId; label: string; icon: React.ReactNode; disabled?: boolean }[] = [
     { id: 'start', label: '1. スタート', icon: <Compass className="w-4 h-4" /> },
@@ -115,8 +124,9 @@ export const Header: React.FC<HeaderProps> = ({
               return (
                 <button
                   key={stage.id}
-                  disabled={stage.disabled}
-                  onClick={() => onSelectStage(stage.id)}
+                  aria-disabled={stage.disabled}
+                  title={stage.disabled ? 'スタート画面で予想を書くと進めます' : undefined}
+                  onClick={() => (stage.disabled ? handleLockedClick() : onSelectStage(stage.id))}
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${
                     isActive
                       ? 'bg-[#1D2B53] text-white dark:bg-[#4D9DE0] dark:text-[#0E1626] shadow-xs'
@@ -125,13 +135,22 @@ export const Header: React.FC<HeaderProps> = ({
                       : 'text-sub hover:text-[#1D2B53] dark:hover:text-[#EAEFFC] hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
-                  {stage.icon}
+                  {stage.disabled ? <Lock className="w-3.5 h-3.5" /> : stage.icon}
                   <span>{stage.label}</span>
                 </button>
               );
             })}
           </nav>
         </div>
+
+        {showLockedNotice && canProceedToPractice === false && (
+          <div role="status" className="max-w-6xl mx-auto px-4 pb-2">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 text-xs font-bold text-[#B45309] dark:text-[#FFC93C]">
+              <Lock className="w-3.5 h-3.5 shrink-0" />
+              <span>先に「1. スタート」の下で、予想（Q1・Q2）を書こう。書くと練習ステージから先に進めます。</span>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* リセット確認モーダル */}
