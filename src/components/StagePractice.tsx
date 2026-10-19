@@ -110,6 +110,9 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
     [p3State]
   );
 
+  // 照準線は、練習③の問いに答えてから表示できる
+  const p3Answered = p3State.answer.trim().length > 0;
+
   // 発射練習の「飛び出す速さ」（古い保存データには無いので既定値で補う）
   const launchSpeed = p3State.launchSpeed ?? DEFAULT_PRACTICE3.launchSpeed;
 
@@ -245,7 +248,7 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
             onAnimationFinish={handleAnimationFinish}
             onCurrentPointChange={setCurrentPt}
             onUpdateConfig={handleUpdatePracticeConfig}
-            showSightLine={activeTab === 3 && p3State.showSightLine}
+            showSightLine={activeTab === 3 && p3State.showSightLine && p3Answered}
             focus={focus}
           />
         </div>
@@ -524,20 +527,21 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
                     照準線（発射台から缶への直線）
                   </span>
                   <span className="text-[11px] text-sub">
-                    {p3State.answer.trim().length > 0
-                      ? '考察を記入したので表示できます'
-                      : '問いに答えたあとに確認してみよう'}
+                    {p3Answered
+                      ? '問いに答えたので表示できます'
+                      : '下の問いに答えると表示できるようになります'}
                   </span>
                 </div>
                 <button
                   onClick={() => onUpdateP3({ showSightLine: !p3State.showSightLine })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
-                    p3State.showSightLine
+                  disabled={!p3Answered}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                    p3State.showSightLine && p3Answered
                       ? 'bg-rose-50 dark:bg-rose-950/40 border-[#E63946] text-[#E63946]'
                       : 'bg-slate-50 dark:bg-slate-800 border-[#D6DEF0] dark:border-[#263657] text-sub'
                   }`}
                 >
-                  {p3State.showSightLine ? '照準線を隠す' : '照準線を表示'}
+                  {p3State.showSightLine && p3Answered ? '照準線を隠す' : '照準線を表示'}
                 </button>
               </div>
 
@@ -734,7 +738,7 @@ function renderHintBox(
     3: {
       1: {
         title: 'ヒント1：見る場所',
-        text: '缶に当たったときの発射台の向き（角度 θ）と、つるされている缶の最初の位置関係を直線で結んでみよう。（照準線を表示してみよう）',
+        text: '缶に当たったときの発射台の向き（角度 θ）は、発射台の先端からつるされた缶へ引いた直線と比べてどうなっているかな？（問いに答えると、照準線を表示して確かめられる）',
       },
       2: {
         title: 'ヒント2：比べ方',

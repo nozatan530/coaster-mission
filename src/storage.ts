@@ -55,7 +55,8 @@ export const DEFAULT_PRACTICE2: Practice2State = {
 export const DEFAULT_PRACTICE3: Practice3State = {
   launchHeight: 0.80,
   launchSpeed: 2.9,
-  launchAngle: 31,
+  // 初めは缶へまっすぐ向けない角度にしておく（31°で缶の中心を向く）
+  launchAngle: 20,
   canHeight: 1.40,
   showSightLine: false,
   answer: '',
