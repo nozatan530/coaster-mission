@@ -51,6 +51,21 @@
   color: var(--color-subtext);
 }
 
+/* 指で操作する端末（スマホ・タブレット）では、ボタンを押しやすい大きさにそろえる */
+@media (pointer: coarse) {
+  button {
+    min-height: 40px;
+  }
+  /* 幅はアイコンだけ・文字だけのボタンに限る（横並びのタブなどが文字の幅より縮まないように） */
+  button:has(> svg:only-child),
+  button:not(:has(*)) {
+    min-width: 40px;
+  }
+  input[type='range'] {
+    min-height: 32px;
+  }
+}
+
 /* Print CSS */
 @media print {
   @page {
