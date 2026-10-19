@@ -275,7 +275,7 @@ ${reportState.reflection.q3 || '（未記入）'}
         <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
           <div className="flex items-center justify-between text-xs text-sub mb-1">
             <span>高校 物理基礎「ボールコースター・ミッション」学習成果レポート</span>
-            <span className="font-mono">Rail: 6.00m Constraint</span>
+            <span>使えるレール 6.0 m</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-[#1D2B53] dark:text-[#EAEFFC]">
             ボールコースター・ミッション 振り返りシート
@@ -323,7 +323,7 @@ ${reportState.reflection.q3 || '（未記入）'}
           </p>
 
           <div className="rounded-xl overflow-hidden border border-[#D6DEF0] dark:border-[#263657]">
-            <CourseCanvas config={config} isAnimating={false} className="border-none shadow-none" />
+            <CourseCanvas config={config} isAnimating={false} staticView className="border-none shadow-none" />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">

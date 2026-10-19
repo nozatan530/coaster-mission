@@ -74,6 +74,8 @@ interface CourseCanvasProps {
   showSightLine?: boolean;
   // 練習ステージ：その部品だけのコースを描く（physics の practice と同じ形）
   focus?: PracticeFocus;
+  // レポート用：再生の操作を出さず、印刷しやすいよう常に明るい背景で描く
+  staticView?: boolean;
   className?: string;
 }
 
@@ -86,6 +88,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
   onUpdateConfig,
   showSightLine = false,
   focus,
+  staticView = false,
   className = '',
 }) => {
   // どの部品を描くか（練習では1つだけ）
@@ -551,7 +554,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
       };
 
       // --- 背景：実験室の壁と床、ものさし ---
-      const isDark = document.documentElement.classList.contains('dark');
+      const isDark = !staticView && document.documentElement.classList.contains('dark');
       const palette = { dark: isDark };
       drawLabScene(ctx, width, height, floorY, palette);
 
@@ -1043,7 +1046,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
 
       ctx.restore();
     },
-    [config, showSightLine, focus, showStartPart, showSlowPart, showLaunchPart, simulationResult, getPositionAtTime, hoveredHandle, onUpdateConfig]
+    [config, showSightLine, focus, staticView, showStartPart, showSlowPart, showLaunchPart, simulationResult, getPositionAtTime, hoveredHandle, onUpdateConfig]
   );
 
   // --- 効果音：時刻 a から b のあいだに起きたことの音を鳴らす ---
@@ -1350,7 +1353,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
       />
 
       {/* Canvas 下部のアニメーション操作バー（図に重ねず、図の下に置く） */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 border-t border-[#D6DEF0]/80 dark:border-[#263657]/80 text-xs">
+      <div className={`${staticView ? 'hidden' : 'flex'} flex-wrap items-center justify-between gap-2 px-3 py-1.5 border-t border-[#D6DEF0]/80 dark:border-[#263657]/80 text-xs`}>
         <div className="flex items-center gap-1.5">
           <button
             onClick={handleTogglePlay}
