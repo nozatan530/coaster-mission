@@ -299,34 +299,49 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
       }
       const courseEndX = curX;
 
-      // 発射台への坂
+      // 発射台 (0.30m)：水平に入ったレールが、先端で角度θまで反り上がるジャンプ台として描く。
+      // 先端の位置（水平位置・高さ）は physics と同じにし、根元側を円弧で下げて描く（見た目だけ）
+      const rad = (config.launchAngle * Math.PI) / 180;
+      const launchDx = PHYSICS_CONSTANTS.LAUNCH_FLAT_LENGTH * Math.cos(rad);
+      const launchTipY = config.launchHeight;
+      const rampRadius = rad > 0.001 ? launchDx / Math.sin(rad) : 0;
+      const rampDrop = rad > 0.001 ? rampRadius * (1 - Math.cos(rad)) : 0;
+      const rampStartY = launchTipY - rampDrop;
+
+      // 発射台への坂（水平の長さは physics と同じ。終わりの高さだけジャンプ台の根元に合わせる）
+      const launchSlopeStartX = curX;
+      const launchSlopeStartY = curY;
       if (showLaunchPart && showStartPart) {
         const deltaHLaunch = curY - config.launchHeight;
         const slopeDxLaunch = 2.0 * Math.abs(deltaHLaunch) * Math.cos((30 * Math.PI) / 180);
-        segments.push({ x1: curX, y1: curY, x2: curX + slopeDxLaunch, y2: config.launchHeight, type: 'slope' });
+        segments.push({ x1: curX, y1: curY, x2: curX + slopeDxLaunch, y2: rampStartY, type: 'slope' });
         curX += slopeDxLaunch;
-        curY = config.launchHeight;
       }
+      curY = config.launchHeight;
 
       const launchPostX = curX;
-      if (showLaunchPart) {
-        posts.push({ x: curX, y: curY, label: `発:${Math.round(curY * 100)}` });
-      }
-
-      // 発射台 (0.30m 角度θ)
-      const rad = (config.launchAngle * Math.PI) / 180;
-      const launchDx = PHYSICS_CONSTANTS.LAUNCH_FLAT_LENGTH * Math.cos(rad);
       const launchTipX = curX + launchDx;
-      const launchTipY = config.launchHeight;
+
+      // ジャンプ台のレールの高さ（x はジャンプ台の範囲内）
+      const rampYAt = (x: number) => {
+        if (rad <= 0.001) return launchTipY;
+        const dx = Math.max(0, Math.min(launchDx, x - launchPostX));
+        return rampStartY + rampRadius - Math.sqrt(Math.max(0, rampRadius * rampRadius - dx * dx));
+      };
+
       if (showLaunchPart) {
-        segments.push({ x1: curX, y1: curY, x2: launchTipX, y2: launchTipY, type: 'launch' });
+        const rampSteps = 12;
+        for (let i = 0; i < rampSteps; i++) {
+          const xa = launchPostX + (launchDx * i) / rampSteps;
+          const xb = launchPostX + (launchDx * (i + 1)) / rampSteps;
+          segments.push({ x1: xa, y1: rampYAt(xa), x2: xb, y2: rampYAt(xb), type: 'launch' });
+        }
       }
 
-      // 標的缶位置 (先端から水平1.0m)
+      // 標的缶位置 (先端から水平1.0m)。缶はその右のスタンドから腕を出し、電磁石で吊るす
       const canRealX = launchTipX + PHYSICS_CONSTANTS.CAN_HORIZONTAL_DISTANCE;
-      if (showLaunchPart) {
-        posts.push({ x: canRealX, y: 1.55, label: `標的:1m` });
-      }
+      const canStandX = canRealX + 0.16;
+      const canArmY = 1.6;
 
       // 等方スケール
       const padLeft = 36;
@@ -381,24 +396,32 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
       ctx.lineTo(toScreenX(maxRealX) + 10, floorY);
       ctx.stroke();
 
+      // 実験用スタンド（台座・支柱・レールをはさむクランプ）
+      const drawStand = (sx: number, syTop: number) => {
+        // 支柱
+        ctx.strokeStyle = '#94A3B8';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(sx, floorY - 3);
+        ctx.lineTo(sx, syTop + 4);
+        ctx.stroke();
+        // 台座
+        ctx.fillStyle = '#64748B';
+        ctx.beginPath();
+        ctx.roundRect(sx - 11, floorY - 4, 22, 4, 1.5);
+        ctx.fill();
+        // クランプ
+        ctx.fillStyle = '#475569';
+        ctx.beginPath();
+        ctx.roundRect(sx - 4, syTop + 2, 8, 6, 1.5);
+        ctx.fill();
+      };
+
       // 支柱
       posts.forEach((p) => {
         const sx = toScreenX(p.x);
         const syTop = toScreenY(p.y);
-        ctx.strokeStyle = '#94A3B8';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(sx, floorY);
-        ctx.lineTo(sx, syTop);
-        ctx.stroke();
-
-        ctx.fillStyle = '#64748B';
-        ctx.fillRect(sx - 5, floorY - 3, 10, 3);
-
-        ctx.fillStyle = '#3B82F6';
-        ctx.beginPath();
-        ctx.arc(sx, syTop, 3.5, 0, Math.PI * 2);
-        ctx.fill();
+        drawStand(sx, syTop);
 
         if (p.label) {
           ctx.fillStyle = '#1E293B';
@@ -407,6 +430,64 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
           ctx.fillText(p.label, sx, syTop - 7);
         }
       });
+
+      if (showLaunchPart) {
+        // 発射台（ジャンプ台）のスタンド：根元と先端の近くの2か所で支える
+        const rootX = launchPostX + launchDx * 0.12;
+        const tipStandX = launchPostX + launchDx * 0.8;
+        drawStand(toScreenX(rootX), toScreenY(rampYAt(rootX)));
+        drawStand(toScreenX(tipStandX), toScreenY(rampYAt(tipStandX)));
+        ctx.fillStyle = '#1E293B';
+        ctx.font = '9px "M PLUS Rounded 1c", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          `発射台 ${Math.round(config.launchHeight * 100)}cm`,
+          toScreenX(launchPostX + launchDx / 2),
+          toScreenY(rampStartY) + 16
+        );
+
+        // 缶のスタンド：支柱・腕・電磁石
+        const sStandX = toScreenX(canStandX);
+        const sArmY = toScreenY(canArmY);
+        const sMagX = toScreenX(canRealX);
+        ctx.strokeStyle = '#94A3B8';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(sStandX, floorY - 3);
+        ctx.lineTo(sStandX, sArmY);
+        ctx.lineTo(sMagX, sArmY);
+        ctx.stroke();
+        ctx.fillStyle = '#64748B';
+        ctx.beginPath();
+        ctx.roundRect(sStandX - 13, floorY - 4, 26, 4, 1.5);
+        ctx.fill();
+        // 電磁石
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.roundRect(sMagX - 6, sArmY, 12, 8, 2);
+        ctx.fill();
+        ctx.fillStyle = '#64748B';
+        ctx.font = '9px "M PLUS Rounded 1c", sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('電磁石', sMagX - 9, sArmY + 8);
+
+        // 発射台の先端から缶までの水平距離 1.0 m
+        const sTip = toScreenX(launchTipX);
+        const dimY = floorY + 14;
+        ctx.strokeStyle = '#94A3B8';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sTip, dimY - 4);
+        ctx.lineTo(sTip, dimY + 4);
+        ctx.moveTo(sMagX, dimY - 4);
+        ctx.lineTo(sMagX, dimY + 4);
+        ctx.moveTo(sTip, dimY);
+        ctx.lineTo(sMagX, dimY);
+        ctx.stroke();
+        ctx.fillStyle = '#64748B';
+        ctx.textAlign = 'center';
+        ctx.fillText('1.0 m', (sTip + sMagX) / 2, dimY - 3);
+      }
 
       // レール
       ctx.lineWidth = 5;
@@ -534,7 +615,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
           ctx.strokeStyle = '#94A3B8';
           ctx.lineWidth = 1.2;
           ctx.beginPath();
-          ctx.moveTo(sCanX, toScreenY(1.55));
+          ctx.moveTo(sCanX, toScreenY(canArmY) + 8);
           ctx.lineTo(sCanX, sCanY - canPixelH / 2);
           ctx.stroke();
         } else {
@@ -586,8 +667,17 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         }
       }
 
-      // ボール
-      const ballPt = pos.ball;
+      // ボール（発射台の坂とジャンプ台の上では、描いたレールの高さに合わせる）
+      let ballPt = pos.ball;
+      if (showLaunchPart && !pos.isLaunched) {
+        const bx = ballPt.x;
+        if (bx >= launchPostX - 1e-6 && bx <= launchTipX + 1e-6) {
+          ballPt = { ...ballPt, y: rampYAt(bx) };
+        } else if (showStartPart && bx > launchSlopeStartX && bx < launchPostX) {
+          const ratio = (bx - launchSlopeStartX) / (launchPostX - launchSlopeStartX);
+          ballPt = { ...ballPt, y: launchSlopeStartY + (rampStartY - launchSlopeStartY) * ratio };
+        }
+      }
       const sBallX = toScreenX(ballPt.x);
       const sBallY = toScreenY(ballPt.y);
       const ballRadius = 6.5;
@@ -622,7 +712,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
           id: 'startHeight',
           x: toScreenX(0),
           y: toScreenY(config.startHeight),
-          radius: 14,
+          radius: 11,
           label: 'スタート台',
           valueStr: `${Math.round(config.startHeight * 100)}cm`,
           color: '#5AB0F0',
@@ -635,7 +725,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
             id: 'loop1Bottom',
             x: toScreenX(loopItems[0].centerX),
             y: toScreenY(config.loop1Bottom),
-            radius: 14,
+            radius: 11,
             label: 'ループ1最下点',
             valueStr: `${Math.round(config.loop1Bottom * 100)}cm`,
             color: '#5AB0F0',
@@ -649,7 +739,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
             id: 'loop2Bottom',
             x: toScreenX(loopItems[1].centerX),
             y: toScreenY(config.loop2Bottom),
-            radius: 14,
+            radius: 11,
             label: 'ループ2最下点',
             valueStr: `${Math.round(config.loop2Bottom * 100)}cm`,
             color: '#5AB0F0',
@@ -662,7 +752,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
           id: 'slowHeight',
           x: toScreenX(slowStartX),
           y: toScreenY(config.slowHeight),
-          radius: 14,
+          radius: 11,
           label: 'ゆっくり区間',
           valueStr: `${Math.round(config.slowHeight * 100)}cm`,
           color: '#FFC93C',
@@ -674,7 +764,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
           id: 'launchHeight',
           x: toScreenX(launchPostX),
           y: toScreenY(config.launchHeight),
-          radius: 14,
+          radius: 11,
           label: '発射台高さ',
           valueStr: `${Math.round(config.launchHeight * 100)}cm`,
           color: '#E63946',
@@ -686,7 +776,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
           id: 'launchAngle',
           x: arrowEndX,
           y: arrowEndY,
-          radius: 14,
+          radius: 11,
           label: '発射角度',
           valueStr: `${config.launchAngle}°`,
           color: '#E63946',
@@ -696,9 +786,9 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         // 7) 標的缶ハンドル
         if (showLaunchPart) handles.push({
           id: 'canHeight',
-          x: sCanX,
+          x: toScreenX(canStandX),
           y: toScreenY(config.canHeight),
-          radius: 16,
+          radius: 12,
           label: '缶の位置',
           valueStr: `${Math.round(config.canHeight * 100)}cm`,
           color: '#1F9D74',
@@ -723,7 +813,8 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
           // 外枠リング
           ctx.beginPath();
           ctx.arc(h.x, h.y, h.radius, 0, Math.PI * 2);
-          ctx.fillStyle = '#FFFFFF';
+          // 下の装置が透けて見えるよう、つまみは半透明にする
+          ctx.fillStyle = isHovered || isDragging ? '#FFFFFF' : 'rgba(255, 255, 255, 0.55)';
           ctx.fill();
           ctx.lineWidth = isDragging ? 3 : 2;
           ctx.strokeStyle = h.color;
@@ -1078,8 +1169,8 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         onPointerCancel={handlePointerUp}
       />
 
-      {/* Canvas 下部のアニメーション操作バー */}
-      <div className="absolute bottom-2 left-2 right-2 flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-white/90 dark:bg-[#17223B]/90 backdrop-blur-xs rounded-lg border border-[#D6DEF0]/80 dark:border-[#263657]/80 text-xs shadow-xs">
+      {/* Canvas 下部のアニメーション操作バー（図に重ねず、図の下に置く） */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 border-t border-[#D6DEF0]/80 dark:border-[#263657]/80 text-xs">
         <div className="flex items-center gap-1.5">
           <button
             onClick={handleTogglePlay}
