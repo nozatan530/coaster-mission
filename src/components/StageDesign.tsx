@@ -116,9 +116,12 @@ export const StageDesign: React.FC<StageDesignProps> = ({
     setTimeout(() => setIsAnimating(true), 20);
   };
 
+  // 「すべる物体」は比べるための切り替え。公式記録（10回連続）は「転がる球」でだけ取る
+  const isSlidingMode = config.motionType === 'sliding';
+
   // 10回連続実行
   const handleRunTenTimes = () => {
-    if (railInfo.isExceeded) return;
+    if (railInfo.isExceeded || isSlidingMode) return;
     setIsAnimating(false);
     const batch = simulateTenRuns(config);
     setBatchResult(batch);
@@ -353,13 +356,24 @@ export const StageDesign: React.FC<StageDesignProps> = ({
           {/* 10回連続（本番公式記録） */}
           <button
             onClick={handleRunTenTimes}
-            disabled={railInfo.isExceeded || isAnimating}
+            disabled={railInfo.isExceeded || isAnimating || isSlidingMode}
+            title={isSlidingMode ? '公式記録は「転がる球」で走らせます' : undefined}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#1D2B53] dark:bg-[#5AB0F0] text-white dark:text-[#0E1626] text-xs sm:text-sm font-black shadow-md hover:opacity-90 active:scale-98 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <RotateCw className={`w-4 h-4 ${isAnimating ? 'animate-spin' : ''}`} />
             <span>10回連続で本番試走！（公式記録）</span>
           </button>
         </div>
+
+        {isSlidingMode && (
+          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-xs text-[#B45309] dark:text-[#FFC93C] flex items-center gap-2">
+            <Info className="w-4 h-4 shrink-0" />
+            <span>
+              いまは「すべる物体」で比べるモードです。1回ずつ走らせて、転がる球との違いを確かめよう。
+              10回連続（公式記録）は「転がる球」に戻すと走らせられます。
+            </span>
+          </div>
+        )}
 
         {/* まだこの設計で走らせていないときの案内 */}
         {!hasRunThisDesign && !isAnimating && (
