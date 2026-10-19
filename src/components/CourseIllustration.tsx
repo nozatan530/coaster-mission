@@ -6,7 +6,7 @@
 
 import React, { useMemo } from 'react';
 import { CourseConfig } from '../types';
-import { PHYSICS_CONSTANTS, simulateRun } from '../physics';
+import { PHYSICS_CONSTANTS, getCanDistance, simulateRun } from '../physics';
 
 interface CourseIllustrationProps {
   config: CourseConfig;
@@ -97,8 +97,9 @@ export const CourseIllustration: React.FC<CourseIllustrationProps> = ({
     const launchX = x;
     const launchH = h;
 
-    // 缶（発射台の先端から水平に 1.0 m 先）
-    const canX = launchX + PHYSICS_CONSTANTS.CAN_HORIZONTAL_DISTANCE;
+    // 缶（発射台の先端からの水平距離は、つるす高さで決まる）
+    const canDistance = getCanDistance(config.canHeight);
+    const canX = launchX + canDistance;
     const can = PHYSICS_CONSTANTS.CAN_SPECS[config.canSize];
 
     // 飛んでいく道すじ（理想の1回の発射の速さから描く）
@@ -109,7 +110,7 @@ export const CourseIllustration: React.FC<CourseIllustrationProps> = ({
       const th = (config.launchAngle * Math.PI) / 180;
       const g = PHYSICS_CONSTANTS.G;
       for (let i = 0; i <= 24; i++) {
-        const dx = (PHYSICS_CONSTANTS.CAN_HORIZONTAL_DISTANCE * i) / 24;
+        const dx = (canDistance * i) / 24;
         const t = dx / (v * Math.cos(th));
         const y = launchH + v * Math.sin(th) * t - 0.5 * g * t * t;
         if (y < 0) break;
@@ -126,6 +127,7 @@ export const CourseIllustration: React.FC<CourseIllustrationProps> = ({
     const maxH = Math.max(config.startHeight, config.canHeight + can.height / 2, ...loops.map((l) => l.bottom + 2 * l.r));
     return {
       canHitH,
+      canDistance,
       segments,
       loops,
       labels,
@@ -347,7 +349,7 @@ export const CourseIllustration: React.FC<CourseIllustrationProps> = ({
             fontWeight={500}
             fill="var(--color-subtext)"
           >
-            ← 1.0 m →
+            ← {layout.canDistance.toFixed(2)} m →
           </text>
         </g>
       )}

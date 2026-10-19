@@ -48,8 +48,15 @@ export const PHYSICS_CONSTANTS = {
   ROLLING_FACTOR: 0.7, // 転がる球: 0.7 * v^2 (1/2 mv^2 の 1.4倍)
   SLIDING_FACTOR: 0.5, // すべる物体: 0.5 * v^2
 
-  // 缶当ての水平距離 (m)
-  CAN_HORIZONTAL_DISTANCE: 1.0,
+  // 発射台の先端から缶までの水平距離 (m)。高い缶ほど遠くに置く（最上段ばかりが得にならないように）
+  // つるす高さ 60 cm → 0.80 m … 140 cm → 1.40 m（一直線に結ぶ）。docs/balance.md で決めた
+  CAN_DISTANCES: {
+    1.40: 1.40,
+    1.20: 1.25,
+    1.00: 1.10,
+    0.80: 0.95,
+    0.60: 0.80,
+  } as Record<number, number>,
 
   // 許容誤差マージン (0.8 cm = 0.008 m)
   HIT_MARGIN_M: 0.008,
@@ -82,9 +89,16 @@ export const PHYSICS_CONSTANTS = {
     loopLossMin: 0.5, // ループ損失係数 一様分布 0.5 ~ 1.5 倍
     loopLossMax: 1.5,
     launchAngleStdDeg: 1.2, // 発射角 ± 正規分布 標準偏差1.2°
-    lateralStdM: 0.03, // 左右のずれ 正規分布 標準偏差 3cm
+    // 左右のずれ：正規分布。標準偏差は缶までの距離に比例し、1 m あたり 2.0 cm（向きの誤差なので遠いほど大きい）
+    lateralStdPerM: 0.02,
   },
 };
+
+// 缶までの水平距離 (m)。表にない高さは、60 cm → 0.80 m と 140 cm → 1.40 m を結ぶ直線で決める
+export function getCanDistance(canHeight: number): number {
+  const key = Math.round(canHeight * 100) / 100;
+  return PHYSICS_CONSTANTS.CAN_DISTANCES[key] ?? 0.8 + 0.75 * (canHeight - 0.6);
+}
 
 // ループのレール長
 export function getLoopRailLength(radius: number): number {
@@ -272,7 +286,7 @@ export function simulateRun(
     if (options.forcedLateralDelta !== undefined) {
       lateralOffset = options.forcedLateralDelta;
     } else {
-      lateralOffset = randomGaussian(0, PHYSICS_CONSTANTS.VARIABILITY.lateralStdM);
+      lateralOffset = randomGaussian(0, PHYSICS_CONSTANTS.VARIABILITY.lateralStdPerM * getCanDistance(canHeight));
     }
   }
 
@@ -798,8 +812,9 @@ export function simulateRun(
     });
   }
 
-  // 水平1.0m到達時刻 (滞空時間)
-  const tAirHit = PHYSICS_CONSTANTS.CAN_HORIZONTAL_DISTANCE / v0x;
+  // 缶の位置（水平距離）に届く時刻 (滞空時間)
+  const canDistance = getCanDistance(canHeight);
+  const tAirHit = canDistance / v0x;
 
   // 缶の仕様
   const canSpec = PHYSICS_CONSTANTS.CAN_SPECS[canSize];
@@ -856,7 +871,7 @@ export function simulateRun(
   const canYAtHit = canHeight - 0.5 * PHYSICS_CONSTANTS.G * tAirHit * tAirHit;
   const canBottomAtHit = canYAtHit - canSpec.height / 2;
   const deltaY = ballYAtHit - canYAtHit;
-  const aimYAtTarget = launchTipY + PHYSICS_CONSTANTS.CAN_HORIZONTAL_DISTANCE * Math.tan(rad);
+  const aimYAtTarget = launchTipY + canDistance * Math.tan(rad);
 
   const projectileData = {
     tHit: tLaunch + tAirHit,

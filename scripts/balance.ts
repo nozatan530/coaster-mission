@@ -9,7 +9,7 @@
  * 乱数は種を固定しているので、同じ回数なら毎回同じ結果になる。
  */
 
-import { calculateRailUsage, simulateRun, PHYSICS_CONSTANTS } from '../src/physics';
+import { calculateRailUsage, getCanDistance, simulateRun, PHYSICS_CONSTANTS } from '../src/physics';
 import type { CanSize, CourseConfig } from '../src/types';
 
 const RUNS = Number(process.argv[2]) || 1000;
@@ -26,9 +26,9 @@ function seededRandom(seed: number) {
   };
 }
 
-// 缶の中心へまっすぐ向ける角度（発射台の先端から水平に 1.0 m 先）
+// 缶の中心へまっすぐ向ける角度（缶までの水平距離は、つるす高さで決まる）
 function aimAngle(launchHeight: number, canHeight: number) {
-  const deg = Math.round((Math.atan((canHeight - launchHeight) / PHYSICS_CONSTANTS.CAN_HORIZONTAL_DISTANCE) * 180) / Math.PI);
+  const deg = Math.round((Math.atan((canHeight - launchHeight) / getCanDistance(canHeight)) * 180) / Math.PI);
   return Math.max(0, Math.min(60, deg));
 }
 

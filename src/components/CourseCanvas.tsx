@@ -6,7 +6,7 @@
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { CourseConfig, PracticeFocus, SimulationResult, TrajectoryPoint } from '../types';
-import { PHYSICS_CONSTANTS } from '../physics';
+import { PHYSICS_CONSTANTS, getCanDistance } from '../physics';
 import { Play, Pause, RotateCcw, CheckCircle2, AlertTriangle, Move, Volume2, VolumeX } from 'lucide-react';
 import {
   drawCan,
@@ -519,8 +519,9 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         }
       }
 
-      // 標的缶位置 (先端から水平1.0m)。缶はその右のスタンドから腕を出し、電磁石で吊るす
-      const canRealX = launchTipX + PHYSICS_CONSTANTS.CAN_HORIZONTAL_DISTANCE;
+      // 標的缶位置（先端からの水平距離は、つるす高さで決まる）。缶はその右のスタンドから腕を出し、電磁石で吊るす
+      const canDistance = getCanDistance(config.canHeight);
+      const canRealX = launchTipX + canDistance;
       const canStandX = canRealX + 0.16;
       const canArmY = 1.6;
 
@@ -612,7 +613,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         ctx.textAlign = 'right';
         ctx.fillText('電磁石', toScreenX(canRealX) - 10, toScreenY(canArmY) + 9);
 
-        // 発射台の先端から缶までの水平距離 1.0 m（床の上に寸法線）
+        // 発射台の先端から缶までの水平距離（床の上に寸法線）
         const sTip = toScreenX(launchTipX);
         const sMagX = toScreenX(canRealX);
         const dimY = floorY + 15;
@@ -629,7 +630,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         ctx.fillStyle = isDark ? 'rgba(255,255,255,0.8)' : 'rgba(60,35,10,0.9)';
         ctx.font = 'bold 9px "M PLUS Rounded 1c", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('1.0 m', (sTip + sMagX) / 2, dimY - 3);
+        ctx.fillText(`${canDistance.toFixed(2)} m`, (sTip + sMagX) / 2, dimY - 3);
       }
 
       // --- ゆっくり区間の計測区間（黄色い帯） ---
@@ -710,7 +711,7 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
 
       if (showSightLine && showLaunchPart) {
         const sCanAimX = toScreenX(canRealX);
-        const aimY = config.launchHeight + PHYSICS_CONSTANTS.CAN_HORIZONTAL_DISTANCE * Math.tan(rad);
+        const aimY = config.launchHeight + canDistance * Math.tan(rad);
         ctx.strokeStyle = 'rgba(230, 57, 70, 0.5)';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
