@@ -48,7 +48,7 @@ const base: CourseConfig = {
 interface Design {
   name: string;
   config: CourseConfig;
-  // concept.md の表の値（理想の点・平均点・成功率%）
+  // concept.md の表の値（理想の点・平均点・成功率%）。物理や定数を変えたら、ここと concept.md をそろえる
   concept: { ideal: number; average: number; success: number; rail: number };
 }
 
@@ -56,17 +56,17 @@ const designList: Design[] = [
   {
     name: 'ループなし・ゆっくり145・小さい缶140',
     config: { ...base },
-    concept: { rail: 2.5, ideal: 102, average: 83, success: 76 },
+    concept: { rail: 2.5, ideal: 102, average: 80, success: 74 },
   },
   {
     name: '大ループだけ・ゆっくり区間はあきらめる',
     config: { ...base, loopType: 'large', loop1Bottom: 0.6, slowHeight: 0.6, launchHeight: 0.7 },
-    concept: { rail: 4.9, ideal: 110, average: 91, success: 77 },
+    concept: { rail: 4.9, ideal: 110, average: 86, success: 70 },
   },
   {
     name: '小ループだけ・ゆっくり140・中の缶140',
     config: { ...base, loopType: 'small', loop1Bottom: 1.0, slowHeight: 1.4, launchHeight: 0.6, canSize: 'medium' },
-    concept: { rail: 5.2, ideal: 108, average: 102, success: 91 },
+    concept: { rail: 5.6, ideal: 107, average: 98, success: 86 },
   },
   {
     name: '大＋小ループ・ゆっくり区間はあきらめる・中の缶140',
@@ -79,7 +79,7 @@ const designList: Design[] = [
       launchHeight: 0.6,
       canSize: 'medium',
     },
-    concept: { rail: 5.8, ideal: 110, average: 104, success: 91 },
+    concept: { rail: 5.8, ideal: 110, average: 98, success: 83 },
   },
   {
     name: '全部入り（大＋小・ゆっくり130・小さい缶）※規定外',
