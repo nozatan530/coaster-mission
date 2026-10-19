@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-ink: #1D2B53;
+    --color-sky: #5AB0F0;
+    --color-red: #E63946;
+    --color-yellow: #FFC93C;
+    --color-bg: #F4F8FF;
+    --color-card: #FFFFFF;
+    --color-line: #D6DEF0;
+    --color-success: #1F9D74;
+    --color-fail: #D1495B;
+    --color-subtext: #5A6A85;
+  }
+
+  .dark {
+    --color-ink: #EAEFFC;
+    --color-sky: #4D9DE0;
+    --color-red: #F25C69;
+    --color-yellow: #FFD460;
+    --color-bg: #0E1626;
+    --color-card: #17223B;
+    --color-line: #263657;
+    --color-success: #28B788;
+    --color-fail: #E26D7C;
+    --color-subtext: #96A6C5;
+  }
+
+  body {
+    font-family: 'M PLUS Rounded 1c', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+  }
+}
+
+/* Custom utility classes */
+.bg-theme {
+  background-color: var(--color-bg);
+}
+.bg-card-theme {
+  background-color: var(--color-card);
+}
+.border-theme {
+  border-color: var(--color-line);
+}
+.text-ink {
+  color: var(--color-ink);
+}
+.text-sub {
+  color: var(--color-subtext);
+}
+
+/* Print CSS */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-card {
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+    margin-bottom: 12px !important;
+    padding: 12px !important;
+  }
+
+  .print-break-inside-avoid {
+    page-break-inside: avoid;
+  }
+
+  .print-page-break {
+    page-break-before: always;
+  }
+}
