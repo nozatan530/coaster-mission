@@ -3,7 +3,7 @@
  * レール制限なしで物理現象と法則を深く体験・解明する共通レイアウト
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   Practice1State,
   Practice2State,
@@ -50,8 +50,13 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
   const [isAnimating, setIsAnimating] = useState(false);
   const [currentPt, setCurrentPt] = useState<TrajectoryPoint | null>(null);
 
+  // 結果（判定・速さ・得点）は、その設定で走らせ終えてから見せる。設定を変えたらまた隠す
+  const [finishedKey, setFinishedKey] = useState<string | null>(null);
+  const runKeyRef = useRef('');
+
   const handleAnimationFinish = useCallback(() => {
     setIsAnimating(false);
+    setFinishedKey(runKeyRef.current);
   }, []);
 
   // --- Practice 1 コース設定 ---
@@ -115,6 +120,10 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
     () => simulateRun(currentConfig, { isIdeal: true, practice: focus, launchSpeed }),
     [currentConfig, focus, launchSpeed]
   );
+
+  const runKey = JSON.stringify([activeTab, currentConfig, launchSpeed]);
+  runKeyRef.current = runKey;
+  const showResult = finishedKey === runKey;
 
   // 棒グラフの目盛りの基準（はじめに持っている力学的エネルギーを、高さに換算した値）
   const energyBaseHeight =
@@ -311,38 +320,42 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
               />
 
               {/* 結果サマリー */}
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-sub">頂上での速度:</span>
-                  <span className="font-bold font-mono">
-                    {simResult.failReason === 'loop_fall'
-                      ? '頂上まで届かない'
-                      : simResult.speeds.loop1Top !== undefined
-                      ? `${simResult.speeds.loop1Top.toFixed(2)} m/s`
-                      : '到達できず'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sub">通過に必要な最小速度 (v² ≥ gr):</span>
-                  <span className="font-bold font-mono">
-                    {simResult.speeds.loop1TopCrit !== undefined
-                      ? `${simResult.speeds.loop1TopCrit.toFixed(2)} m/s`
-                      : '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pt-1 border-t border-slate-200 dark:border-slate-700">
-                  <span className="font-bold">判定:</span>
-                  {simResult.smallLoopPassed || simResult.largeLoopPassed ? (
-                    <span className="text-[#1F9D74] font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-4 h-4" /> クリア！
+              {showResult ? (
+  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-sub">頂上での速度:</span>
+                    <span className="font-bold font-mono">
+                      {simResult.failReason === 'loop_fall'
+                        ? '頂上まで届かない'
+                        : simResult.speeds.loop1Top !== undefined
+                        ? `${simResult.speeds.loop1Top.toFixed(2)} m/s`
+                        : '到達できず'}
                     </span>
-                  ) : (
-                    <span className="text-[#E63946] font-bold flex items-center gap-1">
-                      <XCircle className="w-4 h-4" /> ループで落下
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sub">通過に必要な最小速度 (v² ≥ gr):</span>
+                    <span className="font-bold font-mono">
+                      {simResult.speeds.loop1TopCrit !== undefined
+                        ? `${simResult.speeds.loop1TopCrit.toFixed(2)} m/s`
+                        : '-'}
                     </span>
-                  )}
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-slate-200 dark:border-slate-700">
+                    <span className="font-bold">判定:</span>
+                    {simResult.smallLoopPassed || simResult.largeLoopPassed ? (
+                      <span className="text-[#1F9D74] font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" /> クリア！
+                      </span>
+                    ) : (
+                      <span className="text-[#E63946] font-bold flex items-center gap-1">
+                        <XCircle className="w-4 h-4" /> ループで落下
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <NotRunYet />
+              )}
             </div>
           )}
 
@@ -368,34 +381,38 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
               />
 
               {/* 結果サマリー */}
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-sub">中央での速度:</span>
-                  <span className="font-bold font-mono">
-                    {simResult.slowSpeedKmh !== undefined
-                      ? `${simResult.slowSpeedKmh.toFixed(2)} km/h`
-                      : '停止'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sub">獲得得点 (5.0km/h以下):</span>
-                  <span className="font-bold text-[#FFC93C] font-mono">
-                    +{simResult.slowSpeedPoints} 点
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pt-1 border-t border-slate-200 dark:border-slate-700">
-                  <span className="font-bold">判定:</span>
-                  {simResult.failReason === 'slow_stop' || simResult.failReason === 'slope_rollback' ? (
-                    <span className="text-[#E63946] font-bold flex items-center gap-1">
-                      <XCircle className="w-4 h-4" /> 途中で停止
+              {showResult ? (
+  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-sub">中央での速度:</span>
+                    <span className="font-bold font-mono">
+                      {simResult.slowSpeedKmh !== undefined
+                        ? `${simResult.slowSpeedKmh.toFixed(2)} km/h`
+                        : '停止'}
                     </span>
-                  ) : (
-                    <span className="text-[#1F9D74] font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-4 h-4" /> 通過成功！
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sub">獲得得点 (5.0km/h以下):</span>
+                    <span className="font-bold text-[#FFC93C] font-mono">
+                      +{simResult.slowSpeedPoints} 点
                     </span>
-                  )}
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-slate-200 dark:border-slate-700">
+                    <span className="font-bold">判定:</span>
+                    {simResult.failReason === 'slow_stop' || simResult.failReason === 'slope_rollback' ? (
+                      <span className="text-[#E63946] font-bold flex items-center gap-1">
+                        <XCircle className="w-4 h-4" /> 途中で停止
+                      </span>
+                    ) : (
+                      <span className="text-[#1F9D74] font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" /> 通過成功！
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <NotRunYet />
+              )}
             </div>
           )}
 
@@ -525,20 +542,24 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
               </div>
 
               {/* 命中判定 */}
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-1">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold">判定:</span>
-                  {simResult.canHitSuccess ? (
-                    <span className="text-[#1F9D74] font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-4 h-4" /> 缶に命中！ (+{simResult.canPoints}点)
-                    </span>
-                  ) : (
-                    <span className="text-[#E63946] font-bold flex items-center gap-1">
-                      <XCircle className="w-4 h-4" /> 外れ ({simResult.failDescription})
-                    </span>
-                  )}
+              {showResult ? (
+  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold">判定:</span>
+                    {simResult.canHitSuccess ? (
+                      <span className="text-[#1F9D74] font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" /> 缶に命中！ (+{simResult.canPoints}点)
+                      </span>
+                    ) : (
+                      <span className="text-[#E63946] font-bold flex items-center gap-1">
+                        <XCircle className="w-4 h-4" /> 外れ ({simResult.failDescription})
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <NotRunYet />
+              )}
             </div>
           )}
         </div>
@@ -617,6 +638,14 @@ export const StagePractice: React.FC<StagePracticeProps> = ({
     </div>
   );
 };
+
+// まだ走らせていないときに、結果の欄の代わりに出す案内
+const NotRunYet: React.FC = () => (
+  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-700 text-sub flex items-center gap-2">
+    <Play className="w-3.5 h-3.5 text-[#5AB0F0]" />
+    <span>どうなるか予想してから「走らせる」を押そう。結果はここに出ます。</span>
+  </div>
+);
 
 // スライダー & +/- ボタン対応の高さ操作コンポーネント
 const HeightControl: React.FC<{

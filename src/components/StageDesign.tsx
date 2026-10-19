@@ -75,6 +75,13 @@ export const StageDesign: React.FC<StageDesignProps> = ({
   // 10回連続結果
   const [batchResult, setBatchResult] = useState<ReturnType<typeof simulateTenRuns> | null>(null);
 
+  // 結果（得点・失敗原因・理想得点・10回連続の結果）は、いまの設計で走らせたあとだけ見せる。
+  // 設計を変えたら隠す（前の設計の結果が残って見えないように）
+  const configKey = JSON.stringify(config);
+  const [ranKey, setRanKey] = useState<string | null>(null);
+  const [batchKey, setBatchKey] = useState<string | null>(null);
+  const hasRunThisDesign = ranKey === configKey;
+
   // 変更理由メモ入力
   const [noteInput, setNoteInput] = useState('');
   const [predictedScoreInput, setPredictedScoreInput] = useState('');
@@ -86,6 +93,7 @@ export const StageDesign: React.FC<StageDesignProps> = ({
     setIsAnimating(false);
     const res = simulateRun(config, { isIdeal: true });
     setActiveSimResult(res);
+    setRanKey(configKey);
     setTimeout(() => setIsAnimating(true), 20);
   };
 
@@ -95,6 +103,7 @@ export const StageDesign: React.FC<StageDesignProps> = ({
     setIsAnimating(false);
     const res = simulateRun(config, { isIdeal: false });
     setActiveSimResult(res);
+    setRanKey(configKey);
     setTimeout(() => setIsAnimating(true), 20);
   };
 
@@ -104,6 +113,8 @@ export const StageDesign: React.FC<StageDesignProps> = ({
     setIsAnimating(false);
     const batch = simulateTenRuns(config);
     setBatchResult(batch);
+    setRanKey(configKey);
+    setBatchKey(configKey);
     // 最初の1回の軌道でアニメーション
     setActiveSimResult(batch.batchTrials[0]);
     setTimeout(() => setIsAnimating(true), 20);
@@ -224,9 +235,11 @@ export const StageDesign: React.FC<StageDesignProps> = ({
             <span className="bg-white dark:bg-[#17223B] px-2 py-0.5 rounded border border-[#D6DEF0] dark:border-[#263657] font-mono text-[11px]">
               発射速度 {idealResult.speeds.launchTip.toFixed(1)}m/s
             </span>
-            <span className="bg-amber-50 dark:bg-amber-950/40 text-[#D97706] dark:text-[#FFC93C] font-bold px-2 py-0.5 rounded border border-amber-200 dark:border-amber-900/40 font-mono text-[11px]">
-              理想得点: {idealResult.totalScore}点
-            </span>
+            {hasRunThisDesign && (
+              <span className="bg-amber-50 dark:bg-amber-950/40 text-[#D97706] dark:text-[#FFC93C] font-bold px-2 py-0.5 rounded border border-amber-200 dark:border-amber-900/40 font-mono text-[11px]">
+                理想得点: {idealResult.totalScore}点
+              </span>
+            )}
           </div>
 
           {/* 転がる球 vs すべる物体 の切替 */}
@@ -335,8 +348,16 @@ export const StageDesign: React.FC<StageDesignProps> = ({
           </button>
         </div>
 
+        {/* まだこの設計で走らせていないときの案内 */}
+        {!hasRunThisDesign && !isAnimating && (
+          <div className="p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs text-sub flex items-center gap-2">
+            <Info className="w-4 h-4 text-[#5AB0F0] shrink-0" />
+            <span>この設計ではまだ走らせていません。予想得点を書いてから走らせよう。結果はここに出ます。</span>
+          </div>
+        )}
+
         {/* 直近の試走結果表示 */}
-        {activeSimResult && !isAnimating && (
+        {activeSimResult && !isAnimating && hasRunThisDesign && (
           <div className="p-4 rounded-xl bg-[#F4F8FF] dark:bg-[#0E1626] border border-[#D6DEF0] dark:border-[#263657] space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-bold text-xs text-[#1D2B53] dark:text-[#EAEFFC] flex items-center gap-1.5">
@@ -379,7 +400,7 @@ export const StageDesign: React.FC<StageDesignProps> = ({
         )}
 
         {/* 10回連続の統計・失敗内訳 */}
-        {batchResult && (
+        {batchResult && batchKey === configKey && (
           <div className="p-4 rounded-xl bg-white dark:bg-[#17223B] border-2 border-[#1F9D74] shadow-sm space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-2">
               <div>
