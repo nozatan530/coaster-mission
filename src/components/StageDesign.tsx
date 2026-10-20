@@ -253,11 +253,9 @@ export const StageDesign: React.FC<StageDesignProps> = ({
             <span className="bg-white dark:bg-[#17223B] px-2 py-0.5 rounded border border-[#D6DEF0] dark:border-[#263657] font-mono text-[11px]">
               発射速度 {idealResult.speeds.launchTip.toFixed(1)}m/s
             </span>
-            {hasRunThisDesign && (
-              <span className="bg-amber-50 dark:bg-amber-950/40 text-[#D97706] dark:text-[#FFC93C] font-bold px-2 py-0.5 rounded border border-amber-200 dark:border-amber-900/40 font-mono text-[11px]">
-                理想得点: {idealResult.totalScore}点
-              </span>
-            )}
+            <span className="bg-amber-50 dark:bg-amber-950/40 text-[#D97706] dark:text-[#FFC93C] font-bold px-2 py-0.5 rounded border border-amber-200 dark:border-amber-900/40 font-mono text-[11px]">
+              理想得点: {idealResult.totalScore}点
+            </span>
           </div>
 
           {/* 転がる球 vs すべる物体 の切替 */}
@@ -331,6 +329,31 @@ export const StageDesign: React.FC<StageDesignProps> = ({
           </div>
         </div>
 
+        {/* 走らせる前のシミュレーションの点（ばらつきなしの理想の1回）。設定を変えるとすぐ変わる */}
+        <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[11px] font-bold text-[#B45309] dark:text-[#FFC93C]">
+              この設計のシミュレーション（ばらつきなしの理想の1回）
+            </div>
+            {railInfo.isExceeded ? (
+              <div className="text-xs font-bold text-[#E63946]">レールが 6.0 m を超えているので、走らせられません</div>
+            ) : (
+              <div className="text-[11px] text-sub font-mono">
+                ループ +{idealResult.loopPoints} ／ ゆっくり +{idealResult.slowSpeedPoints} ／ 缶 +{idealResult.canPoints}
+                {idealResult.failReason && <span className="text-[#E63946]">（{FAIL_REASON_LABELS[idealResult.failReason]}）</span>}
+              </div>
+            )}
+          </div>
+          {!railInfo.isExceeded && (
+            <div className="text-right">
+              <span className="text-[11px] text-sub mr-1">合計</span>
+              <span className="text-2xl font-black font-mono text-[#D97706] dark:text-[#FFC93C]">{idealResult.totalScore}</span>
+              <span className="text-xs font-bold text-[#D97706] dark:text-[#FFC93C] ml-0.5">点</span>
+              <div className="text-[10px] text-sub">本番はばらつきで下がることがある</div>
+            </div>
+          )}
+        </div>
+
         {/* 走らせるボタン群 */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2">
@@ -381,40 +404,47 @@ export const StageDesign: React.FC<StageDesignProps> = ({
         {!hasRunThisDesign && !isAnimating && (
           <div className="p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs text-sub flex items-center gap-2">
             <Info className="w-4 h-4 text-[#5AB0F0] shrink-0" />
-            <span>この設計ではまだ走らせていません。予想得点を書いてから走らせよう。結果はここに出ます。</span>
+            <span>この設計ではまだ走らせていません。予想得点を書いてから走らせよう。走らせた結果（合計点）はここに出ます。</span>
           </div>
         )}
 
         {/* 直近の試走結果表示 */}
         {activeSimResult && !isAnimating && hasRunThisDesign && (
-          <div className="p-4 rounded-xl bg-[#F4F8FF] dark:bg-[#0E1626] border border-[#D6DEF0] dark:border-[#263657] space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-bold text-xs text-[#1D2B53] dark:text-[#EAEFFC] flex items-center gap-1.5">
-                {activeSimResult.canHitSuccess ? (
-                  <CheckCircle2 className="w-4 h-4 text-[#1F9D74]" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-[#E63946]" />
+          <div className="p-4 rounded-xl bg-[#F4F8FF] dark:bg-[#0E1626] border-2 border-[#5AB0F0] space-y-2">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <div className="text-xs font-bold text-[#1D2B53] dark:text-[#EAEFFC] flex items-center gap-1.5">
+                  {activeSimResult.canHitSuccess ? (
+                    <CheckCircle2 className="w-4 h-4 text-[#1F9D74]" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-[#E63946]" />
+                  )}
+                  <span>{activeSimResult.isIdeal ? '理想の1回（ばらつきなし）の結果' : '本番の1回の結果'}</span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-mono">
+                  <span className="px-2 py-0.5 rounded bg-white dark:bg-[#17223B] border border-[#D6DEF0] dark:border-[#263657]">
+                    ループ +{activeSimResult.loopPoints}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-white dark:bg-[#17223B] border border-[#D6DEF0] dark:border-[#263657]">
+                    ゆっくり +{activeSimResult.slowSpeedPoints}（
+                    {activeSimResult.slowSpeedKmh !== undefined ? `${activeSimResult.slowSpeedKmh.toFixed(1)}km/h` : '停止'}）
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-white dark:bg-[#17223B] border border-[#D6DEF0] dark:border-[#263657]">
+                    缶 +{activeSimResult.canPoints}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-bold text-sub mr-1">合計</span>
+                <span className="text-4xl font-black font-mono text-[#5AB0F0]">{activeSimResult.totalScore}</span>
+                <span className="text-sm font-bold text-[#5AB0F0] ml-0.5">点</span>
+                {!activeSimResult.isIdeal && (
+                  <div className="text-[11px] text-sub">
+                    シミュレーション {idealResult.totalScore}点 より{' '}
+                    {activeSimResult.totalScore - idealResult.totalScore >= 0 ? '+' : ''}
+                    {activeSimResult.totalScore - idealResult.totalScore}点
+                  </div>
                 )}
-                <span>
-                  {activeSimResult.isIdeal ? '【理想の1回】' : '【本番の1回】'} 結果得点:{' '}
-                  <strong className="text-base font-extrabold text-[#5AB0F0] font-mono">
-                    {activeSimResult.totalScore} 点
-                  </strong>
-                </span>
-              </span>
-
-              <div className="flex items-center gap-2 text-xs font-mono">
-                <span>ループ: +{activeSimResult.loopPoints}</span>
-                <span>·</span>
-                <span>
-                  ゆっくり: +{activeSimResult.slowSpeedPoints} (
-                  {activeSimResult.slowSpeedKmh !== undefined
-                    ? `${activeSimResult.slowSpeedKmh.toFixed(1)}km/h`
-                    : '停止'}
-                  )
-                </span>
-                <span>·</span>
-                <span>缶当て: +{activeSimResult.canPoints}</span>
               </div>
             </div>
 

@@ -1024,6 +1024,28 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         });
       }
 
+      // 本番設計：走り終わったら、右上にこの1回の合計点を出す
+      if (pos.isFinished && simulationResult && !focus && !staticView && tSec > 0) {
+        const label = `合計 ${simulationResult.totalScore}点`;
+        ctx.font = 'bold 16px "M PLUS Rounded 1c", sans-serif';
+        const bw = ctx.measureText(label).width + 24;
+        const bx = width - bw - 10;
+        const by = 10;
+        ctx.fillStyle = isDark ? 'rgba(14,22,38,0.92)' : 'rgba(255,255,255,0.95)';
+        ctx.strokeStyle = '#5AB0F0';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, 32, 10);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = isDark ? '#EAEFFC' : '#1D2B53';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, bx + bw / 2, by + 22);
+        ctx.font = '9px "M PLUS Rounded 1c", sans-serif';
+        ctx.fillStyle = isDark ? '#96A6C5' : '#5A6A85';
+        ctx.fillText(simulationResult.isIdeal ? '理想の1回' : '本番の1回', bx + bw / 2, by + 44);
+      }
+
       // 終了判定エフェクト
       if (pos.isFinished && simulationResult) {
         if (!showLaunchPart && simulationResult.success) {
