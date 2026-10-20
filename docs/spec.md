@@ -25,7 +25,8 @@
 ### 振り返り（2026-10-20、開発）から
 
 - [ ] iPad の Safari・Chromebook の実機で通しで操作する（タッチのボタンの大きさ、効果音）
-- [ ] 公開先を決めて公開する（coaster-mission.meetupsensei.com）
+- [x] 公開先を決めて公開する → GitHub Pages で公開（https://nozatan530.github.io/coaster-mission/、main に push すると自動で更新）
+- [ ] 独自ドメイン（coaster-mission.meetupsensei.com）で公開する場合は、DNS に CNAME を設定し、Pages の Custom domain を指定して、ビルドの VITE_BASE を `/` に戻す
 - [ ] 最初の設計（31°）のまま10回連続を走らせると 21.5 点・成功率 0% になる。授業で様子を見て、必要なら初期値を調整する
 - [ ] 雛形由来の未使用の依存（@google/genai・express・dotenv）と、metadata.json の Gemini の指定を整理する
 - [ ] 授業で使ったあと、生徒の反応をふまえて振り返る（retro）
