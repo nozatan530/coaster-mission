@@ -90,21 +90,9 @@ export const Header: React.FC<HeaderProps> = ({
       <header ref={headerRef} className="no-print sticky top-0 z-40 bg-white/95 dark:bg-[#17223B]/95 backdrop-blur-md border-b border-[#D6DEF0] dark:border-[#263657] shadow-xs">
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
           {/* ロゴ & タイトル */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#5AB0F0] text-white flex items-center justify-center font-black text-lg shadow-sm">
-              軌
-            </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-black tracking-tight text-[#1D2B53] dark:text-[#EAEFFC] flex items-center gap-1.5">
-                ボールコースター・ミッション
-              </h1>
-              <div className="text-[11px] text-sub hidden sm:flex items-center gap-1.5 font-medium">
-                <span>高校「物理基礎」</span>
-                <span>·</span>
-                <span>レール6mの限界に挑め</span>
-              </div>
-            </div>
-          </div>
+          <h1 className="text-base sm:text-lg font-black tracking-tight text-[#1D2B53] dark:text-[#EAEFFC]">
+            ボールコースター・ミッション
+          </h1>
 
           {/* 右側アクション */}
           <div className="flex items-center gap-1 sm:gap-2">
