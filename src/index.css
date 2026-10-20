@@ -76,6 +76,12 @@
   }
 }
 
+/* レポートのテキスト欄は、書いた量に合わせて高さが伸びる（印刷で途中が切れないように） */
+.print-card textarea {
+  field-sizing: content;
+  min-height: 3.2em;
+}
+
 /* Print CSS */
 @media print {
   @page {

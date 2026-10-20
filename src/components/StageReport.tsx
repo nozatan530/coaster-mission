@@ -34,6 +34,11 @@ interface StageReportProps {
   p3State: Practice3State;
   historyEntries: TrialHistoryEntry[];
   onUpdateReport: (updates: Partial<ReportState>) => void;
+  // レポートの画面でも、練習の答えと記録表の理由を書き直せるようにする
+  onUpdateP1: (updates: Partial<Practice1State>) => void;
+  onUpdateP2: (updates: Partial<Practice2State>) => void;
+  onUpdateP3: (updates: Partial<Practice3State>) => void;
+  onUpdateNote: (id: string, notes: string) => void;
 }
 
 export const StageReport: React.FC<StageReportProps> = ({
@@ -44,7 +49,14 @@ export const StageReport: React.FC<StageReportProps> = ({
   p3State,
   historyEntries,
   onUpdateReport,
+  onUpdateP1,
+  onUpdateP2,
+  onUpdateP3,
+  onUpdateNote,
 }) => {
+  const updatePrediction = (key: 'expectedScore' | 'strategy', val: string) => {
+    onUpdateReport({ initialPredictions: { ...reportState.initialPredictions, [key]: val } });
+  };
   const [copySuccess, setCopySuccess] = useState(false);
   // 自動でコピーできなかったとき、手でコピーしてもらうための文章
   const [manualCopyText, setManualCopyText] = useState<string | null>(null);
@@ -297,15 +309,23 @@ ${reportState.reflection.q3 || '（未記入）'}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div className="p-3 rounded-xl bg-[#F4F8FF] dark:bg-[#0E1626] border border-[#D6DEF0] dark:border-[#263657]">
               <span className="text-sub block text-[11px] mb-0.5">目標予想得点:</span>
-              <p className="font-bold text-[#1D2B53] dark:text-[#EAEFFC]">
-                {reportState.initialPredictions.expectedScore || '（未入力）'}
-              </p>
+              <input
+                type="text"
+                value={reportState.initialPredictions.expectedScore}
+                onChange={(e) => updatePrediction('expectedScore', e.target.value)}
+                placeholder="（未入力）"
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#D6DEF0] dark:border-[#263657] bg-white dark:bg-[#0E1626] text-[#1D2B53] dark:text-[#EAEFFC] focus:outline-hidden focus:ring-2 focus:ring-[#5AB0F0]"
+              />
             </div>
             <div className="p-3 rounded-xl bg-[#F4F8FF] dark:bg-[#0E1626] border border-[#D6DEF0] dark:border-[#263657]">
               <span className="text-sub block text-[11px] mb-0.5">得点を狙う作戦:</span>
-              <p className="font-bold text-[#1D2B53] dark:text-[#EAEFFC]">
-                {reportState.initialPredictions.strategy || '（未入力）'}
-              </p>
+              <textarea
+                rows={2}
+                value={reportState.initialPredictions.strategy}
+                onChange={(e) => updatePrediction('strategy', e.target.value)}
+                placeholder="（未入力）"
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#D6DEF0] dark:border-[#263657] bg-white dark:bg-[#0E1626] text-[#1D2B53] dark:text-[#EAEFFC] focus:outline-hidden focus:ring-2 focus:ring-[#5AB0F0]"
+              />
             </div>
           </div>
         </section>
@@ -400,9 +420,13 @@ ${reportState.reflection.q3 || '（未記入）'}
                   ヒント開放: {p1State.hintsOpened.filter(Boolean).length}/3
                 </span>
               </div>
-              <p className="text-[#1D2B53] dark:text-[#EAEFFC]">
-                {p1State.answer || <span className="text-[#E63946]">（未記入）</span>}
-              </p>
+              <textarea
+                rows={2}
+                value={p1State.answer}
+                onChange={(e) => onUpdateP1({ answer: e.target.value })}
+                placeholder="（未記入）ここに答えを書こう"
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#D6DEF0] dark:border-[#263657] bg-white dark:bg-[#0E1626] text-[#1D2B53] dark:text-[#EAEFFC] focus:outline-hidden focus:ring-2 focus:ring-[#5AB0F0]"
+              />
             </div>
 
             <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30">
@@ -412,9 +436,13 @@ ${reportState.reflection.q3 || '（未記入）'}
                   ヒント開放: {p2State.hintsOpened.filter(Boolean).length}/3
                 </span>
               </div>
-              <p className="text-[#1D2B53] dark:text-[#EAEFFC]">
-                {p2State.answer || <span className="text-[#E63946]">（未記入）</span>}
-              </p>
+              <textarea
+                rows={2}
+                value={p2State.answer}
+                onChange={(e) => onUpdateP2({ answer: e.target.value })}
+                placeholder="（未記入）ここに答えを書こう"
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#D6DEF0] dark:border-[#263657] bg-white dark:bg-[#0E1626] text-[#1D2B53] dark:text-[#EAEFFC] focus:outline-hidden focus:ring-2 focus:ring-[#5AB0F0]"
+              />
             </div>
 
             <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30">
@@ -424,9 +452,13 @@ ${reportState.reflection.q3 || '（未記入）'}
                   ヒント開放: {p3State.hintsOpened.filter(Boolean).length}/3
                 </span>
               </div>
-              <p className="text-[#1D2B53] dark:text-[#EAEFFC]">
-                {p3State.answer || <span className="text-[#E63946]">（未記入）</span>}
-              </p>
+              <textarea
+                rows={2}
+                value={p3State.answer}
+                onChange={(e) => onUpdateP3({ answer: e.target.value })}
+                placeholder="（未記入）ここに答えを書こう"
+                className="w-full text-xs px-3 py-2 rounded-lg border border-[#D6DEF0] dark:border-[#263657] bg-white dark:bg-[#0E1626] text-[#1D2B53] dark:text-[#EAEFFC] focus:outline-hidden focus:ring-2 focus:ring-[#5AB0F0]"
+              />
             </div>
           </div>
         </section>
@@ -467,7 +499,16 @@ ${reportState.reflection.q3 || '（未記入）'}
                         {h.averageScore}点
                       </td>
                       <td className="p-2 text-center font-mono">{h.successRate}%</td>
-                      <td className="p-2">{h.notes}</td>
+                      <td className="p-2 min-w-[140px]">
+                        <input
+                          type="text"
+                          value={h.notes}
+                          onChange={(e) => onUpdateNote(h.id, e.target.value)}
+                          placeholder="何を変えたか・なぜか"
+                          aria-label={`#${h.trialNumber} の何を変えたか・なぜか`}
+                          className="w-full text-xs px-2 py-1 rounded-lg border border-[#D6DEF0] dark:border-[#263657] bg-white dark:bg-[#0E1626] text-[#1D2B53] dark:text-[#EAEFFC] focus:outline-hidden focus:ring-2 focus:ring-[#5AB0F0]"
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>

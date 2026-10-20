@@ -239,6 +239,10 @@ export default function App() {
             p3State={p3State}
             historyEntries={historyEntries}
             onUpdateReport={(u) => setReportState((prev) => ({ ...prev, ...u }))}
+            onUpdateP1={(u) => setP1State((prev) => ({ ...prev, ...u }))}
+            onUpdateP2={(u) => setP2State((prev) => ({ ...prev, ...u }))}
+            onUpdateP3={(u) => setP3State((prev) => ({ ...prev, ...u }))}
+            onUpdateNote={handleUpdateNote}
           />
         )}
       </main>
