@@ -5,8 +5,9 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    // 公開先はサブドメインの直下（coaster-mission.meetupsensei.com/）なので、ルートから配信する
-    base: '/',
+    // 配信するパス。ふだんはルート（独自ドメインの直下）。
+    // GitHub Pages（nozatan530.github.io/coaster-mission/）では、ビルド時に VITE_BASE=/coaster-mission/ を渡す
+    base: process.env.VITE_BASE || '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
