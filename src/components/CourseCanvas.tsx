@@ -578,11 +578,18 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
       const launchedNow = tLaunchSim > 0 && tSec >= tLaunchSim;
 
       // --- スタンド ---
-      const drawTag = (text: string, sxIn: number, sy: number) => {
+      // 札（高さ・部品名など）。すでに描いた札と重なるときは、上へずらして読めるようにする
+      const placedTags: { x1: number; x2: number; y1: number; y2: number }[] = [];
+      const drawTag = (text: string, sxIn: number, syIn: number) => {
         let sx = sxIn;
+        let sy = syIn;
         ctx.font = 'bold 9px "M PLUS Rounded 1c", sans-serif';
         const w = ctx.measureText(text).width + 8;
         sx = Math.max(padLeft - 4 + w / 2, Math.min(width - 4 - w / 2, sx));
+        const overlaps = (y: number) =>
+          placedTags.some((t) => sx - w / 2 < t.x2 + 2 && sx + w / 2 > t.x1 - 2 && y - 9 < t.y2 + 1 && y + 4 > t.y1 - 1);
+        for (let i = 0; i < 6 && overlaps(sy); i++) sy -= 15;
+        placedTags.push({ x1: sx - w / 2, x2: sx + w / 2, y1: sy - 9, y2: sy + 4 });
         ctx.fillStyle = isDark ? 'rgba(14,22,38,0.85)' : 'rgba(255,255,255,0.9)';
         ctx.strokeStyle = isDark ? '#263657' : '#D6DEF0';
         ctx.lineWidth = 1;
@@ -663,6 +670,15 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         palette
       );
 
+      // --- ゆっくり区間の光ゲート（速度計） ---
+      if (showSlowPart) {
+        const midX = slowStartX + PHYSICS_CONSTANTS.SLOW_FLAT_LENGTH / 2;
+        const slowEvent = fx.events.find((e) => e.kind === 'slow');
+        const lit = !!slowEvent && Math.abs(tSec - slowEvent.t) < 0.12;
+        drawPhotogate(ctx, toScreenX(midX), toScreenY(config.slowHeight), lit);
+      }
+
+      // 札は装置（光ゲートなど）より後に描き、隠れないようにする
       loopItems.forEach((loop) => {
         const scx = toScreenX(loop.centerX);
         const scy = toScreenY(loop.centerY);
@@ -674,12 +690,9 @@ export const CourseCanvas: React.FC<CourseCanvasProps> = ({
         if (p.label) drawTag(p.label, toScreenX(p.x), toScreenY(p.y) - 12);
       });
 
-      // --- ゆっくり区間の光ゲート（速度計） ---
       if (showSlowPart) {
         const midX = slowStartX + PHYSICS_CONSTANTS.SLOW_FLAT_LENGTH / 2;
         const slowEvent = fx.events.find((e) => e.kind === 'slow');
-        const lit = !!slowEvent && Math.abs(tSec - slowEvent.t) < 0.12;
-        drawPhotogate(ctx, toScreenX(midX), toScreenY(config.slowHeight), lit);
         if (slowEvent && tSec >= slowEvent.t && simulationResult?.slowSpeedKmh !== undefined) {
           drawTag(`時速 ${simulationResult.slowSpeedKmh.toFixed(1)} km`, toScreenX(midX), toScreenY(config.slowHeight) - 38);
         } else {
