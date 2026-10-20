@@ -14,12 +14,31 @@ interface StageHistoryProps {
   onLoadConfig: (config: CourseConfig) => void;
 }
 
+// 成功率の色分け（80%以上・50%以上・それ未満）
+const successRateClass = (rate: number) =>
+  rate >= 80
+    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-[#1F9D74]'
+    : rate >= 50
+    ? 'bg-amber-50 dark:bg-amber-950/40 text-[#D97706]'
+    : 'bg-rose-50 dark:bg-rose-950/40 text-[#E63946]';
+
 export const StageHistory: React.FC<StageHistoryProps> = ({
   historyEntries,
   onUpdateNote,
   onDeleteEntry,
   onLoadConfig,
 }) => {
+  // 公式記録なので、押し間違いで消えないように確かめる
+  const confirmDelete = (entry: TrialHistoryEntry) => {
+    if (
+      window.confirm(
+        `#${entry.trialNumber} の記録を消しますか？\n10回連続の結果と「何を変えたか・なぜか」が消え、元に戻せません。`
+      )
+    ) {
+      onDeleteEntry(entry.id);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
       <div className="bg-white dark:bg-[#17223B] border border-[#D6DEF0] dark:border-[#263657] rounded-2xl p-5 shadow-xs">
@@ -48,7 +67,65 @@ export const StageHistory: React.FC<StageHistoryProps> = ({
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* スマホ・タブレット（1024px 未満）：1回分を1枚のカードにし、平均点と成功率を上に大きく出す */}
+          <ul className="lg:hidden space-y-3">
+            {historyEntries.map((entry) => (
+              <li
+                key={entry.id}
+                className="rounded-xl border border-[#D6DEF0] dark:border-[#263657] p-3 space-y-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold font-mono text-[#5AB0F0]">#{entry.trialNumber}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-sub">平均点</span>
+                    <span className="font-mono font-extrabold text-[#1F9D74] text-lg">{entry.averageScore}点</span>
+                    <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-mono font-bold ${successRateClass(entry.successRate)}`}>
+                      成功率 {entry.successRate}%
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-sub">
+                  <span>予想：{entry.predictedScore ?? '—'}</span>
+                  <span>理想の点：{entry.idealScore}点</span>
+                </div>
+                <div className="font-mono text-[11px] text-[#1D2B53] dark:text-[#EAEFFC] leading-relaxed">
+                  {entry.configSummary}
+                </div>
+                <label className="block">
+                  <span className="text-[11px] font-bold text-sub">何を変えたか・なぜか</span>
+                  <input
+                    type="text"
+                    value={entry.notes}
+                    onChange={(e) => onUpdateNote(entry.id, e.target.value)}
+                    placeholder="何を変えたか・なぜかを記入..."
+                    className="mt-0.5 w-full px-2 py-1.5 text-xs rounded border border-[#D6DEF0] dark:border-[#263657] focus:border-[#5AB0F0] bg-white dark:bg-[#0E1626]"
+                  />
+                </label>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => onLoadConfig(entry.config)}
+                    aria-label={`#${entry.trialNumber} の設計を設計画面に戻す`}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-[#5AB0F0] border border-[#5AB0F0]/50 hover:bg-sky-50 dark:hover:bg-sky-950/50"
+                  >
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                    <span>この設計に戻す</span>
+                  </button>
+                  <button
+                    onClick={() => confirmDelete(entry)}
+                    aria-label={`#${entry.trialNumber} の記録を削除`}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-sub border border-[#D6DEF0] dark:border-[#263657] hover:text-[#E63946]"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>削除</span>
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {/* PC（1024px 以上）：表で並べる */}
+          <div className="hidden lg:block overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#D6DEF0] dark:border-[#263657] text-sub bg-slate-50/60 dark:bg-slate-900/40">
@@ -89,15 +166,7 @@ export const StageHistory: React.FC<StageHistoryProps> = ({
                     </td>
 
                     <td className="py-3 px-3 text-center font-mono font-bold">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-[11px] ${
-                          entry.successRate >= 80
-                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-[#1F9D74]'
-                            : entry.successRate >= 50
-                            ? 'bg-amber-50 dark:bg-amber-950/40 text-[#D97706]'
-                            : 'bg-rose-50 dark:bg-rose-950/40 text-[#E63946]'
-                        }`}
-                      >
+                      <span className={`inline-block px-2 py-0.5 rounded text-[11px] ${successRateClass(entry.successRate)}`}>
                         {entry.successRate}%
                       </span>
                     </td>
@@ -125,16 +194,7 @@ export const StageHistory: React.FC<StageHistoryProps> = ({
                           <ArrowUpRight className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => {
-                            // 公式記録なので、押し間違いで消えないように確かめる
-                            if (
-                              window.confirm(
-                                `#${entry.trialNumber} の記録を消しますか？\n10回連続の結果と「何を変えたか・なぜか」が消え、元に戻せません。`
-                              )
-                            ) {
-                              onDeleteEntry(entry.id);
-                            }
-                          }}
+                          onClick={() => confirmDelete(entry)}
                           title="削除"
                           aria-label={`#${entry.trialNumber} の記録を削除`}
                           className="p-1 text-sub hover:text-[#E63946] hover:bg-red-50 dark:hover:bg-red-950/50 rounded transition-colors"
@@ -148,6 +208,7 @@ export const StageHistory: React.FC<StageHistoryProps> = ({
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </div>
