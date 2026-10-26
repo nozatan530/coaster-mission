@@ -23,7 +23,7 @@ export const PHYSICS_CONSTANTS = {
   G: 9.8,
 
   // 使えるレール全長 (m)
-  MAX_RAIL_LENGTH: 8.0,
+  MAX_RAIL_LENGTH: 10.0,
 
   // 坂の傾き 30° -> レール長さ = 2.0 * |Δh| (sin 30° = 0.5)
   SLOPE_RAIL_FACTOR: 2.0,
