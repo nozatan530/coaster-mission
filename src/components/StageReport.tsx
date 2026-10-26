@@ -13,6 +13,8 @@ import {
   TrialHistoryEntry,
 } from '../types';
 import { CourseCanvas } from './CourseCanvas';
+import { CourseCodeCard } from './CourseCode';
+import { courseUrl, encodeCourse } from '../courseCode';
 import { calculateRailUsage, simulateRun, PHYSICS_CONSTANTS } from '../physics';
 import {
   Printer,
@@ -168,6 +170,8 @@ export const StageReport: React.FC<StageReportProps> = ({
 ・標的缶: ${PHYSICS_CONSTANTS.CAN_SPECS[config.canSize].name} (床から${Math.round(config.canHeight * 100)} cm)
 ・使用レール長: ${railInfo.total.toFixed(2)} m / ${PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(2)} m (${railInfo.isExceeded ? `${railInfo.excess.toFixed(2)} m 超過` : `残り ${railInfo.remaining.toFixed(2)} m`})
 ・理想の得点: ${idealSim.totalScore} 点
+・コースコード: ${encodeCourse(config)}
+・このコースを開くリンク: ${courseUrl(config)}
 
 ■ 4. 本番試走の記録（最高成績）
 ${
@@ -398,6 +402,8 @@ ${reportState.reflection.q3 || '（未記入）'}
               )}
             </div>
           </div>
+
+          <CourseCodeCard config={config} />
         </section>
 
         {/* 3. 練習ステージの答え & ヒント段階 */}

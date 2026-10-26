@@ -3,7 +3,7 @@
  * メインアプリケーションコンポーネント
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header, StageId } from './components/Header';
 import { Stage0Start } from './components/Stage0Start';
 import { StagePractice } from './components/StagePractice';
@@ -30,6 +30,7 @@ import {
   STORAGE_KEYS,
   isStorageAvailable,
 } from './storage';
+import { COURSE_PARAM, decodeCourse } from './courseCode';
 
 export default function App() {
   // 記録を保存できない端末では、閉じると消えることを知らせる
@@ -165,6 +166,30 @@ export default function App() {
       loop2Bottom: Math.min(next.loop2Bottom, maxBottom),
     });
   };
+
+  // QR コードやリンク（?course=...）から開いたとき、そのコースを本番設計に読み込む
+  const courseLinkHandled = useRef(false);
+  useEffect(() => {
+    if (courseLinkHandled.current) return;
+    courseLinkHandled.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get(COURSE_PARAM);
+    if (!code) return;
+    // 読み込み直しで何度も聞かないよう、アドレスからコードを消しておく
+    params.delete(COURSE_PARAM);
+    const rest = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
+
+    const result = decodeCourse(code);
+    if (!result.ok) {
+      window.alert(`コースコードを読み込めませんでした：${result.error}`);
+      return;
+    }
+    if (window.confirm(`コース「${code}」を本番設計に読み込みます。\nいまの設計はこのコースに置きかわります（記録表の記録は消えません）。よいですか？`)) {
+      handleUpdateConfig(result.config);
+      setCurrentStage('design');
+    }
+  }, []);
 
   const handleLoadConfig = (savedConfig: CourseConfig) => {
     setConfig({ ...savedConfig });

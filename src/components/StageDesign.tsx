@@ -14,6 +14,7 @@ import {
   TrajectoryPoint,
 } from '../types';
 import { CourseCanvas } from './CourseCanvas';
+import { CourseCodeLoader } from './CourseCode';
 import { CourseIllustration } from './CourseIllustration';
 import { EnergyBarChart } from './EnergyBarChart';
 import {
@@ -551,6 +552,8 @@ export const StageDesign: React.FC<StageDesignProps> = ({
           </div>
           <CourseIllustration config={config} showLabels={false} showFlight={false} className="max-h-24" />
         </div>
+
+        <CourseCodeLoader config={config} onLoad={onUpdateConfig} />
 
         <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
           <Sliders className="w-4 h-4 text-[#5AB0F0]" />
