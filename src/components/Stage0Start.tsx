@@ -151,7 +151,7 @@ export const Stage0Start: React.FC<Stage0StartProps> = ({
           <p className="text-sm sm:text-base text-sub leading-relaxed max-w-2xl">
             鉄のボールを転がして、<strong className={strong}>ループ</strong>・
             <strong className={strong}>ゆっくり区間</strong>・<strong className={strong}>缶当て</strong>
-            で点を取るコースを設計しよう。使えるレールは全部で <strong className={strong}>6.0 m</strong>。
+            で点を取るコースを設計しよう。使えるレールは全部で <strong className={strong}>{PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(1)} m</strong>。
             スタートを高くするとボールは勢いよく走るけれど、そのぶん坂が長くなって、レールが足りなくなる。
             どこにエネルギーとレールを使うかが勝負です。
           </p>
@@ -195,7 +195,7 @@ export const Stage0Start: React.FC<Stage0StartProps> = ({
             <li className="flex items-start gap-2">
               <span className={strong}>2.</span>
               <span>
-                使えるレールは<strong className="text-[#E63946]">全部で 6.0 m まで</strong>。
+                使えるレールは<strong className="text-[#E63946]">全部で {PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(1)} m まで</strong>。
                 1 cm でも超えると走らせられない。
               </span>
             </li>
@@ -333,7 +333,7 @@ export const Stage0Start: React.FC<Stage0StartProps> = ({
                 </div>
                 {ex.rail.isExceeded ? (
                   <div className="mt-1 font-bold text-[#E63946]">
-                    6.0 m を {ex.rail.excess.toFixed(1)} m 超えるので、走らせられない
+                    {PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(1)} m を {ex.rail.excess.toFixed(1)} m 超えるので、走らせられない
                   </div>
                 ) : (
                   <div className="mt-1">
@@ -360,7 +360,7 @@ export const Stage0Start: React.FC<Stage0StartProps> = ({
           <div className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
             <div className="font-bold text-[#FFC93C] mb-1">STEP 2：本番の設計と試走</div>
             <p className="text-sub text-[11px]">
-              6.0 m のレールでコースを設計して走らせる。直したら走らせ直す。記録は「10回連続」の平均点。
+              {PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(1)} m のレールでコースを設計して走らせる。直したら走らせ直す。記録は「10回連続」の平均点。
             </p>
           </div>
           <div className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">

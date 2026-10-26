@@ -1,6 +1,6 @@
 /**
  * 本番の設計 & 試走ステージ (Stage 3 & 4)
- * 6.0m レール制限メーター、コース即時反映、1回試走、10回連続、試走ログ記録
+ * レール制限メーター（上限は PHYSICS_CONSTANTS.MAX_RAIL_LENGTH）、コース即時反映、1回試走、10回連続、試走ログ記録
  */
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -176,7 +176,7 @@ export const StageDesign: React.FC<StageDesignProps> = ({
           <div className="flex items-center gap-2">
             <Gauge className="w-5 h-5 text-[#5AB0F0]" />
             <h3 className="text-sm sm:text-base font-bold text-[#1D2B53] dark:text-[#EAEFFC]">
-              使用レールメーター（上限 6.00 m）
+              使用レールメーター（上限 {PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(2)} m）
             </h3>
           </div>
 
@@ -206,7 +206,7 @@ export const StageDesign: React.FC<StageDesignProps> = ({
         {/* プログレスバー */}
         <div className="w-full h-4 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
           <div
-            style={{ width: `${Math.min(100, (railInfo.total / 6.0) * 100)}%` }}
+            style={{ width: `${Math.min(100, (railInfo.total / PHYSICS_CONSTANTS.MAX_RAIL_LENGTH) * 100)}%` }}
             className={`transition-all duration-200 ${
               railInfo.isExceeded ? 'bg-[#E63946]' : 'bg-[#5AB0F0]'
             }`}
@@ -216,9 +216,9 @@ export const StageDesign: React.FC<StageDesignProps> = ({
         <div className="flex justify-between items-center text-[11px] text-sub mt-1.5 font-mono">
           <span>0.00 m</span>
           <span className="font-bold text-[#1D2B53] dark:text-[#EAEFFC] text-xs">
-            現在: {railInfo.total.toFixed(2)} m / 6.00 m
+            現在: {railInfo.total.toFixed(2)} m / {PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(2)} m
           </span>
-          <span>6.00 m</span>
+          <span>{PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(2)} m</span>
         </div>
 
         {/* レール内訳アコーディオン */}
@@ -336,7 +336,7 @@ export const StageDesign: React.FC<StageDesignProps> = ({
               この設計のシミュレーション（ばらつきなしの理想の1回）
             </div>
             {railInfo.isExceeded ? (
-              <div className="text-xs font-bold text-[#E63946]">レールが 6.0 m を超えているので、走らせられません</div>
+              <div className="text-xs font-bold text-[#E63946]">レールが {PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(1)} m を超えているので、走らせられません</div>
             ) : (
               <div className="text-[11px] text-sub font-mono">
                 ループ +{idealResult.loopPoints} ／ ゆっくり +{idealResult.slowSpeedPoints} ／ 缶 +{idealResult.canPoints}

@@ -166,7 +166,7 @@ export const StageReport: React.FC<StageReportProps> = ({
 ・ゆっくり区間高さ: ${Math.round(config.slowHeight * 100)} cm
 ・発射台高さ・角度: ${Math.round(config.launchHeight * 100)} cm, ${config.launchAngle}°
 ・標的缶: ${PHYSICS_CONSTANTS.CAN_SPECS[config.canSize].name} (床から${Math.round(config.canHeight * 100)} cm)
-・使用レール長: ${railInfo.total.toFixed(2)} m / 6.00 m (残り ${railInfo.remaining.toFixed(2)} m)
+・使用レール長: ${railInfo.total.toFixed(2)} m / ${PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(2)} m (${railInfo.isExceeded ? `${railInfo.excess.toFixed(2)} m 超過` : `残り ${railInfo.remaining.toFixed(2)} m`})
 ・理想の得点: ${idealSim.totalScore} 点
 
 ■ 4. 本番試走の記録（最高成績）
@@ -287,7 +287,7 @@ ${reportState.reflection.q3 || '（未記入）'}
         <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
           <div className="flex items-center justify-between text-xs text-sub mb-1">
             <span>高校 物理基礎「ボールコースター・ミッション」学習成果レポート</span>
-            <span>使えるレール 6.0 m</span>
+            <span>使えるレール {PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(1)} m</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-[#1D2B53] dark:text-[#EAEFFC]">
             ボールコースター・ミッション 振り返りシート
@@ -374,10 +374,10 @@ ${reportState.reflection.q3 || '（未記入）'}
             <div>
               <span className="text-sub">使用レール長: </span>
               <strong className="font-mono text-sm text-[#1D2B53] dark:text-[#EAEFFC]">
-                {railInfo.total.toFixed(2)} m / 6.00 m
+                {railInfo.total.toFixed(2)} m / {PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(2)} m
               </strong>
               <span className="text-sub text-[11px] ml-1">
-                (残り {railInfo.remaining.toFixed(2)}m)
+                ({railInfo.isExceeded ? `${railInfo.excess.toFixed(2)} m 超過` : `残り ${railInfo.remaining.toFixed(2)} m`})
               </span>
             </div>
 
