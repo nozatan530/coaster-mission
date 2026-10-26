@@ -169,7 +169,7 @@ export const StageReport: React.FC<StageReportProps> = ({
 ・発射台高さ・角度: ${Math.round(config.launchHeight * 100)} cm, ${config.launchAngle}°
 ・標的缶: ${PHYSICS_CONSTANTS.CAN_SPECS[config.canSize].name} (床から${Math.round(config.canHeight * 100)} cm)
 ・使用レール長: ${railInfo.total.toFixed(2)} m / ${PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(2)} m (${railInfo.isExceeded ? `${railInfo.excess.toFixed(2)} m 超過` : `残り ${railInfo.remaining.toFixed(2)} m`})
-・理想の得点: ${idealSim.totalScore} 点
+・理想の得点: ${bestEntry ? `${idealSim.totalScore} 点` : '未試走'}
 ・コースコード: ${encodeCourse(config)}
 ・このコースを開くリンク: ${courseUrl(config)}
 
@@ -388,7 +388,7 @@ ${reportState.reflection.q3 || '（未記入）'}
             <div>
               <span className="text-sub">理想の点: </span>
               <strong className="font-mono text-sm text-[#5AB0F0] mr-3">
-                {idealSim.totalScore} 点
+                {bestEntry ? `${idealSim.totalScore} 点` : '未試走'}
               </strong>
 
               <span className="text-sub">公式最高平均点: </span>

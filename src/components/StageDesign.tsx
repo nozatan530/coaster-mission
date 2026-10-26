@@ -24,6 +24,7 @@ import {
   simulateTenRuns,
   PHYSICS_CONSTANTS,
   FAIL_REASON_LABELS,
+  calculateSlowPoints,
 } from '../physics';
 import { STORAGE_KEYS, safeGetStorage, safeSetStorage } from '../storage';
 import {
@@ -60,6 +61,16 @@ export const StageDesign: React.FC<StageDesignProps> = ({
 
   // 理想状態での事前計算（速さの目安・理想得点）
   const idealResult = useMemo(() => simulateRun(config, { isIdeal: true }), [config]);
+
+  // この設計で取れる点のはんい。全部うまくいったときの点（ゆっくり区間は止まる寸前の最大点）を、角度などの当たり外れによらず出す
+  const scoreRange = useMemo(() => {
+    const hasLarge = config.loopType === 'large' || config.loopType === 'small_large' || config.loopType === 'large_small';
+    const hasSmall = config.loopType === 'small' || config.loopType === 'small_large' || config.loopType === 'large_small';
+    const loop = (hasLarge ? PHYSICS_CONSTANTS.LOOP_SCORES.large : 0) + (hasSmall ? PHYSICS_CONSTANTS.LOOP_SCORES.small : 0);
+    const slow = calculateSlowPoints(0);
+    const can = PHYSICS_CONSTANTS.CAN_SPECS[config.canSize].score + (PHYSICS_CONSTANTS.CAN_HEIGHT_SCORES[config.canHeight] ?? 0);
+    return { loop, slow, can, max: loop + slow + can };
+  }, [config.loopType, config.canSize, config.canHeight]);
 
   // アニメーション・試走状態
   const [isAnimating, setIsAnimating] = useState(false);
@@ -240,23 +251,9 @@ export const StageDesign: React.FC<StageDesignProps> = ({
       {/* コース可視化 Canvas & リアルタイム速さ目安 */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* 各地点の速さ目安 (理想値) */}
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="font-bold text-sub">理想の通過目安:</span>
-            {idealResult.speeds.loop1Top !== undefined && (
-              <span className="bg-white dark:bg-[#17223B] px-2 py-0.5 rounded border border-[#D6DEF0] dark:border-[#263657] font-mono text-[11px]">
-                ループ頂上 {idealResult.speeds.loop1Top.toFixed(1)}m/s
-              </span>
-            )}
-            <span className="bg-white dark:bg-[#17223B] px-2 py-0.5 rounded border border-[#D6DEF0] dark:border-[#263657] font-mono text-[11px]">
-              ゆっくり {idealResult.slowSpeedKmh !== undefined ? `${idealResult.slowSpeedKmh.toFixed(1)}km/h` : '停止'}
-            </span>
-            <span className="bg-white dark:bg-[#17223B] px-2 py-0.5 rounded border border-[#D6DEF0] dark:border-[#263657] font-mono text-[11px]">
-              発射速度 {idealResult.speeds.launchTip.toFixed(1)}m/s
-            </span>
-            <span className="bg-amber-50 dark:bg-amber-950/40 text-[#D97706] dark:text-[#FFC93C] font-bold px-2 py-0.5 rounded border border-amber-200 dark:border-amber-900/40 font-mono text-[11px]">
-              理想得点: {idealResult.totalScore}点
-            </span>
+          {/* 走らせる前は、速さや点の目安を出さない（数字を見て角度や高さを合わせられないように） */}
+          <div className="text-xs text-sub">
+            速さや点は、<strong className="text-[#1D2B53] dark:text-[#EAEFFC]">走らせて確かめよう</strong>。
           </div>
 
           {/* 転がる球 vs すべる物体 の切替 */}
@@ -311,7 +308,7 @@ export const StageDesign: React.FC<StageDesignProps> = ({
             <label className="block font-bold text-sub mb-1">今回の予想得点（走らせる前に入力）</label>
             <input
               type="text"
-              placeholder="例: 102点取れそう"
+              placeholder="例: 100点くらい"
               value={predictedScoreInput}
               onChange={(e) => setPredictedScoreInput(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-[#D6DEF0] dark:border-[#263657] bg-[#F4F8FF] dark:bg-[#0E1626] text-[#1D2B53] dark:text-[#EAEFFC]"
@@ -322,7 +319,7 @@ export const StageDesign: React.FC<StageDesignProps> = ({
             <label className="block font-bold text-sub mb-1">何を変えたか・なぜか（記録表に残ります）</label>
             <input
               type="text"
-              placeholder="例: 発射台の角度を23°に変えて缶の中心に照準を合わせた"
+              placeholder="例: ゆっくり区間を5 cm 下げて、止まらないようにした"
               value={noteInput}
               onChange={(e) => setNoteInput(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-[#D6DEF0] dark:border-[#263657] bg-[#F4F8FF] dark:bg-[#0E1626] text-[#1D2B53] dark:text-[#EAEFFC]"
@@ -330,27 +327,25 @@ export const StageDesign: React.FC<StageDesignProps> = ({
           </div>
         </div>
 
-        {/* 走らせる前のシミュレーションの点（ばらつきなしの理想の1回）。設定を変えるとすぐ変わる */}
+        {/* 走らせる前は、この設計で取れる点のはんい（全部失敗〜全部成功）だけを見せる。理想の1回の点は出さない */}
         <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="text-[11px] font-bold text-[#B45309] dark:text-[#FFC93C]">
-              この設計のシミュレーション（ばらつきなしの理想の1回）
+              この設計で取れる点のはんい
             </div>
             {railInfo.isExceeded ? (
               <div className="text-xs font-bold text-[#E63946]">レールが {PHYSICS_CONSTANTS.MAX_RAIL_LENGTH.toFixed(1)} m を超えているので、走らせられません</div>
             ) : (
               <div className="text-[11px] text-sub font-mono">
-                ループ +{idealResult.loopPoints} ／ ゆっくり +{idealResult.slowSpeedPoints} ／ 缶 +{idealResult.canPoints}
-                {idealResult.failReason && <span className="text-[#E63946]">（{FAIL_REASON_LABELS[idealResult.failReason]}）</span>}
+                ループ 0〜{scoreRange.loop} ／ ゆっくり区間 0〜{scoreRange.slow}（遅いほど高い） ／ 缶 0〜{scoreRange.can}
               </div>
             )}
           </div>
           {!railInfo.isExceeded && (
             <div className="text-right">
-              <span className="text-[11px] text-sub mr-1">合計</span>
-              <span className="text-2xl font-black font-mono text-[#D97706] dark:text-[#FFC93C]">{idealResult.totalScore}</span>
+              <span className="text-2xl font-black font-mono text-[#D97706] dark:text-[#FFC93C]">0〜{scoreRange.max}</span>
               <span className="text-xs font-bold text-[#D97706] dark:text-[#FFC93C] ml-0.5">点</span>
-              <div className="text-[10px] text-sub">本番はばらつきで下がることがある</div>
+              <div className="text-[10px] text-sub">どこで何点になるかは、走らせてみないとわからない</div>
             </div>
           )}
         </div>
@@ -439,13 +434,6 @@ export const StageDesign: React.FC<StageDesignProps> = ({
                 <span className="text-xs font-bold text-sub mr-1">合計</span>
                 <span className="text-4xl font-black font-mono text-[#5AB0F0]">{activeSimResult.totalScore}</span>
                 <span className="text-sm font-bold text-[#5AB0F0] ml-0.5">点</span>
-                {!activeSimResult.isIdeal && (
-                  <div className="text-[11px] text-sub">
-                    シミュレーション {idealResult.totalScore}点 より{' '}
-                    {activeSimResult.totalScore - idealResult.totalScore >= 0 ? '+' : ''}
-                    {activeSimResult.totalScore - idealResult.totalScore}点
-                  </div>
-                )}
               </div>
             </div>
 
