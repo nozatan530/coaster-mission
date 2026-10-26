@@ -56,7 +56,28 @@ const cases: Case[] = [
   {
     name: 'C 大(50cm)→小(50cm)・ゆっくり130cm・小さい缶',
     config: { ...base, loopType: 'large_small', loop1Bottom: 0.5, loop2Bottom: 0.5, slowHeight: 1.3 },
-    expected: { rail: 8.6, exceeded: true },
+    // レール 10 m なら組めるが、缶が床に落ちて 0 点（全部入りが得とは限らない例）
+    expected: { rail: 8.6, exceeded: false, scores: { loop: 40, slow: 40, can: 0, total: 80 } },
+  },
+  {
+    name: 'D 大(60cm)→小(80cm)・ゆっくり125cm・発射台60cm 26°・大きい缶120cm（ばらつきに強い設計）',
+    config: {
+      ...base,
+      loopType: 'large_small',
+      loop1Bottom: 0.6,
+      loop2Bottom: 0.8,
+      slowHeight: 1.25,
+      launchHeight: 0.6,
+      launchAngle: 26,
+      canSize: 'large',
+      canHeight: 1.2,
+    },
+    expected: { rail: 8.41, exceeded: false, scores: { loop: 40, slow: 11, can: 50, total: 101 } },
+  },
+  {
+    name: 'E 大(10cm)→小(10cm)・ゆっくり145cm・発射台10cm（10 m を超える）',
+    config: { ...base, loopType: 'large_small', loop1Bottom: 0.1, loop2Bottom: 0.1, slowHeight: 1.45, launchHeight: 0.1 },
+    expected: { rail: 12.21, exceeded: true },
   },
 ];
 
